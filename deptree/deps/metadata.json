@@ -1,0 +1,20 @@
+{
+  "generated": "2025-01-01T00:00:00Z",
+  "generator": "solpkg 0.1.0",
+  "repos": [
+    {
+      "name": "tgcware",
+      "type": "tgcware",
+      "url": "https://jupiterrise.com/tgcware/sunos5.7_sparc/stable/",
+      "source": "https://github.com/AstroVPK/tgcwarev2-for-solaris"
+    },
+    {
+      "name": "firefly128",
+      "type": "github",
+      "owner": "firefly128",
+      "repos": ["pizzafool", "sparccord", "wesnoth-sparc"]
+    }
+  ],
+  "package_count": 0,
+  "note": "Run 'solpkg update && solpkg export-deps' to populate"
+}

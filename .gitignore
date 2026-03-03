@@ -1,0 +1,18 @@
+# Build artifacts
+*.o
+solpkg
+solpkg-gui
+solpkg-agent
+
+# Backup files
+*.bak
+*.orig
+*~
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+*.swp
+*.swo

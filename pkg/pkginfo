@@ -1,0 +1,9 @@
+PKG=JWsolpkg
+NAME=solpkg - Solaris SPARC Package Manager
+ARCH=sparc
+VERSION=0.1.0
+CATEGORY=system
+VENDOR=Julian Wolfe
+EMAIL=
+BASEDIR=/opt/solpkg
+CLASSES=none

@@ -1,0 +1,31 @@
+#!/bin/sh
+# preremove - Clean up before solpkg removal
+
+BASEDIR=${BASEDIR:-/opt/solpkg}
+
+echo "Removing solpkg..."
+
+# Stop the agent if running
+if [ -x /etc/init.d/solpkg-agent ]; then
+    /etc/init.d/solpkg-agent stop 2>/dev/null
+fi
+
+# Remove rc links and init.d script
+rm -f /etc/rc2.d/S99solpkg-agent 2>/dev/null
+rm -f /etc/rc0.d/K01solpkg-agent 2>/dev/null
+rm -f /etc/init.d/solpkg-agent 2>/dev/null
+
+# Remove symlinks
+rm -f /usr/local/bin/solpkg 2>/dev/null
+rm -f /usr/local/bin/solpkg-gui 2>/dev/null
+rm -f /usr/local/bin/solpkg-agent 2>/dev/null
+
+# Clean up agent runtime files
+rm -f ${BASEDIR}/var/agent.pid 2>/dev/null
+rm -f ${BASEDIR}/var/agent.log 2>/dev/null
+rm -f ${BASEDIR}/var/update.status 2>/dev/null
+
+echo "Note: Package cache and index files in ${BASEDIR}/var/ are preserved."
+echo "Remove manually with: rm -rf ${BASEDIR}/var"
+
+exit 0

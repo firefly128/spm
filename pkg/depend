@@ -1,0 +1,6 @@
+# solpkg requires TGCware OpenSSL for HTTPS and curl CA certs.
+# Also needs TGCware GCC runtime for building from source.
+P SBossl TGCware OpenSSL shared libraries
+P SBcacrt TGCware curl CA certificate bundle
+# Optional: TGCware GCC for building from source
+# P TGCgcc47 TGCware GCC 4.7 Compiler

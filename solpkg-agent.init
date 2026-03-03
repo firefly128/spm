@@ -1,0 +1,111 @@
+#!/bin/sh
+#
+# solpkg-agent - Solaris init.d script for the solpkg update agent
+#
+# Install:
+#   cp solpkg-agent.init /etc/init.d/solpkg-agent
+#   chmod 755 /etc/init.d/solpkg-agent
+#   ln -s /etc/init.d/solpkg-agent /etc/rc2.d/S99solpkg-agent
+#   ln -s /etc/init.d/solpkg-agent /etc/rc0.d/K01solpkg-agent
+#
+
+AGENT=/opt/solpkg/bin/solpkg-agent
+PIDFILE=/opt/solpkg/var/agent.pid
+LOGFILE=/opt/solpkg/var/agent.log
+
+case "$1" in
+start)
+    if [ ! -x "$AGENT" ]; then
+        echo "solpkg-agent: $AGENT not found"
+        exit 1
+    fi
+
+    if [ -f "$PIDFILE" ]; then
+        PID=`cat "$PIDFILE"`
+        if kill -0 "$PID" 2>/dev/null; then
+            echo "solpkg-agent already running (pid $PID)"
+            exit 0
+        fi
+        # Stale PID file
+        rm -f "$PIDFILE"
+    fi
+
+    echo "Starting solpkg-agent..."
+    $AGENT
+    ;;
+
+stop)
+    if [ -f "$PIDFILE" ]; then
+        PID=`cat "$PIDFILE"`
+        if kill -0 "$PID" 2>/dev/null; then
+            echo "Stopping solpkg-agent (pid $PID)..."
+            kill "$PID"
+            # Wait up to 5 seconds
+            i=0
+            while [ $i -lt 10 ]; do
+                if ! kill -0 "$PID" 2>/dev/null; then
+                    break
+                fi
+                sleep 1
+                i=`expr $i + 1`
+            done
+            if kill -0 "$PID" 2>/dev/null; then
+                echo "Force killing solpkg-agent..."
+                kill -9 "$PID"
+            fi
+        fi
+        rm -f "$PIDFILE"
+    else
+        echo "solpkg-agent not running"
+    fi
+    ;;
+
+restart)
+    $0 stop
+    sleep 1
+    $0 start
+    ;;
+
+status)
+    if [ -f "$PIDFILE" ]; then
+        PID=`cat "$PIDFILE"`
+        if kill -0 "$PID" 2>/dev/null; then
+            echo "solpkg-agent is running (pid $PID)"
+
+            # Show status file if available
+            STATUS=/opt/solpkg/var/update.status
+            if [ -f "$STATUS" ]; then
+                echo "Last check:"
+                cat "$STATUS"
+            fi
+            exit 0
+        else
+            echo "solpkg-agent not running (stale PID file)"
+            exit 1
+        fi
+    else
+        echo "solpkg-agent not running"
+        exit 1
+    fi
+    ;;
+
+reload)
+    if [ -f "$PIDFILE" ]; then
+        PID=`cat "$PIDFILE"`
+        if kill -0 "$PID" 2>/dev/null; then
+            echo "Reloading solpkg-agent config..."
+            kill -HUP "$PID"
+            exit 0
+        fi
+    fi
+    echo "solpkg-agent not running"
+    exit 1
+    ;;
+
+*)
+    echo "Usage: $0 {start|stop|restart|status|reload}"
+    exit 1
+    ;;
+esac
+
+exit 0

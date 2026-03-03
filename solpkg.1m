@@ -1,0 +1,182 @@
+.\" solpkg.1m - Solaris SPARC Package Manager
+.\" Copyright (c) 2025 Julian Wolfe
+.TH SOLPKG 1M "June 2025" "solpkg 0.1.0" "System Administration Commands"
+.SH NAME
+solpkg \- Solaris SPARC package manager for TGCware and GitHub repositories
+.SH SYNOPSIS
+.B solpkg
+.IR command
+.RI [ arguments ]
+.br
+.B solpkg-gui
+.br
+.B solpkg-agent
+.SH DESCRIPTION
+.B solpkg
+is a package manager for Solaris 7 SPARC systems that indexes and installs
+packages from TGCware and GitHub release repositories. It handles package
+downloads over HTTPS (via native OpenSSL), automatic dependency resolution,
+and SVR4 package installation via
+.BR pkgadd (1M).
+.PP
+.B solpkg-gui
+provides a Motif/CDE graphical interface with a two-pane layout showing
+the package list on the left and package details on the right. It supports
+searching, filtering by installed/available status, and one-click
+install, remove, and upgrade operations.
+.PP
+.B solpkg-agent
+is a background daemon that periodically checks repositories for
+available updates and notifies the user via CDE.
+.SH COMMANDS
+.TP
+.B update
+Refresh the package index from all enabled repositories. Downloads the
+latest package lists from TGCware and GitHub and saves them locally.
+.TP
+.BI search " term"
+Search available packages by name, description, or package code.
+Case-insensitive substring matching.
+.TP
+.BI install " pkg" \fR...
+Install one or more packages by name or SVR4 package code. Automatically
+resolves and installs dependencies. Downloads packages to the local cache
+and installs via
+.BR pkgadd (1M)
+with a non-interactive admin file.
+.TP
+.BI remove " pkg" \fR...
+Remove one or more installed packages via
+.BR pkgrm (1M).
+.TP
+.B list
+List all available packages with version, architecture, size,
+repository, and description.
+.TP
+.B list --installed
+List only packages installed through solpkg, with version, SVR4 code,
+install date, and repository.
+.TP
+.BI info " pkg"
+Show detailed information for a package including version, architecture,
+dependencies, download URL, and install status.
+.TP
+.BI deps " pkg"
+Display the full dependency tree for a package, showing which
+dependencies are already installed on the system.
+.TP
+.BI rollback " pkg"
+Roll back a package to its previously installed version using the
+cached package file.
+.TP
+.BI upgrade " \fR[\fPpkg\fR]\fP"
+Upgrade all installed packages, or a specific package, to the latest
+available version.
+.TP
+.B repo list
+Display all configured repositories with their type, URL, and
+enable/disable status.
+.TP
+.B cache clean
+Remove all downloaded package files from the local cache directory.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Display usage information and exit.
+.TP
+.BR \-V ", " \-\-version
+Display version and exit.
+.SH FILES
+.TP
+.I /opt/solpkg/etc/repos.conf
+Repository configuration file. Defines TGCware and GitHub repository
+sources, SSL settings, and agent parameters.
+.TP
+.I /opt/solpkg/var/index/available.idx
+Cached package index (pipe-separated flat file).
+.TP
+.I /opt/solpkg/var/installed.db
+Database of packages installed through solpkg.
+.TP
+.I /opt/solpkg/var/cache/
+Downloaded package file cache.
+.TP
+.I /opt/solpkg/var/rollback/
+Backup files for package rollback.
+.TP
+.I /opt/solpkg/var/admin
+Non-interactive admin file for pkgadd(1M).
+.TP
+.I /usr/tgcware/etc/curl-ca-bundle.pem
+CA certificate bundle used for HTTPS connections.
+.SH ENVIRONMENT
+.TP
+.B DISPLAY
+Required for
+.B solpkg-gui
+to connect to the X11 display. Typically set to \fB:0\fP on CDE.
+.SH EXAMPLES
+Update the package index:
+.PP
+.RS
+.nf
+$ solpkg update
+.fi
+.RE
+.PP
+Search for packages:
+.PP
+.RS
+.nf
+$ solpkg search python
+.fi
+.RE
+.PP
+Install a package and its dependencies:
+.PP
+.RS
+.nf
+# solpkg install python27
+.fi
+.RE
+.PP
+List installed packages:
+.PP
+.RS
+.nf
+$ solpkg list --installed
+.fi
+.RE
+.PP
+Launch the GUI:
+.PP
+.RS
+.nf
+$ DISPLAY=:0 solpkg-gui &
+.fi
+.RE
+.SH NOTES
+.B solpkg
+loads OpenSSL at runtime via
+.BR dlopen (3C)
+to avoid linking against the large OpenSSL shared libraries at build time,
+which is important for the limited resources of vintage SPARC hardware.
+.PP
+Package installation requires root privileges. On systems where
+.B solpkg
+is installed as a regular user, use
+.BR su (1M)
+or
+.BR expect (1)
+to run install/remove operations as root.
+.PP
+TGCware packages are gzip-compressed SVR4 package streams. They are
+automatically decompressed before installation.
+.SH SEE ALSO
+.BR pkgadd (1M),
+.BR pkgrm (1M),
+.BR pkginfo (1),
+.BR pkgtrans (1),
+.BR gzip (1)
+.SH AUTHORS
+Julian Wolfe

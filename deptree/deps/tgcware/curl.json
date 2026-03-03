@@ -1,0 +1,22 @@
+{
+  "name": "curl",
+  "pkg_code": "TGCcurl",
+  "version": "8.18.0",
+  "release": 1,
+  "arch": "sparc",
+  "source_type": "tgcware",
+  "download_url": "https://jupiterrise.com/tgcware/sunos5.7_sparc/stable/curl-8.18.0-1.tgc-sunos5.7-sparc-tgcware.gz",
+  "source_url": "https://github.com/AstroVPK/tgcwarev2-for-solaris/tree/master/curl",
+  "description": "Utility to transfer files with URL syntax",
+  "md5": "884547184329b92cba845598f3bb858e",
+  "deps": [
+    { "code": "TGCgtext", "name": "gettext" },
+    { "code": "TGClgcc1", "name": "libgcc" },
+    { "code": "TGClicnv", "name": "libiconv" },
+    { "code": "TGClidn2", "name": "libidn2" },
+    { "code": "TGClssh2", "name": "libssh2" },
+    { "code": "TGCngh2", "name": "nghttp2" },
+    { "code": "TGCssl3", "name": "openssl" },
+    { "code": "TGCzlib", "name": "zlib" }
+  ]
+}

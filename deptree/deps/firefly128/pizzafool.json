@@ -1,0 +1,12 @@
+{
+  "name": "pizzafool",
+  "pkg_code": "JWpzfool",
+  "version": "1.0",
+  "release": 1,
+  "arch": "sparc",
+  "source_type": "github",
+  "download_url": "https://github.com/firefly128/pizzafool/releases/download/v1.0/pizzafool-1.0-sparc.pkg",
+  "source_url": "https://github.com/firefly128/pizzafool",
+  "description": "PizzaFool - Pizza themed game for Solaris CDE",
+  "deps": []
+}
