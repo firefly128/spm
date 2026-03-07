@@ -41,12 +41,10 @@ pkgadd -d SSTspm-0.1.0-bootstrap-sparc.pkg
 ```
 
 The postinstall script starts `prngd` (for SSL entropy), sets up init scripts,
-and adds `/opt/sst/bin` and `/opt/sst/lib` to your PATH and LD_LIBRARY_PATH
-in `/etc/profile`. After install:
+and adds `/opt/sst/bin` to your system PATH via `/etc/default/login`.
+Log out and back in for the new PATH to take effect, or in an existing shell:
 
 ```sh
-# If in an existing shell, set up the environment:
-LD_LIBRARY_PATH=/opt/sst/lib; export LD_LIBRARY_PATH
 PATH=/opt/sst/bin:$PATH; export PATH
 
 spm update
