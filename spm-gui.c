@@ -98,6 +98,29 @@ static int  vis_count;
 /* Agent status check timer */
 static XtIntervalId agent_timer;
 
+/* Action buttons (global for sensitivity control) */
+static Widget install_btn;
+static Widget remove_btn;
+static Widget upgrade_btn;
+static Widget deps_btn_w;
+static Widget upgrade_all_btn;
+
+/* Version dropdown (OptionMenu) */
+static Widget  version_option_menu;
+static Widget  version_pulldown;
+static Widget  version_buttons[64];
+static int     version_indices[64];  /* avail_idx for each dropdown entry */
+static int     version_count;
+static int     selected_version_idx; /* avail_idx of the chosen dropdown entry */
+
+/* Selection state: computed when a package is selected */
+static int     sel_is_installed;     /* 1 if any version installed */
+static int     sel_inst_idx;         /* index into g_db->installed, or -1 */
+static int     sel_is_avail;         /* 1 if in available index */
+static int     sel_has_upgrade;      /* 1 if newer version available */
+static int     sel_nversions;        /* how many versions available */
+static int     sel_ver_list[64];     /* all version avail indices */
+
 /* ================================================================
  * FORWARD DECLARATIONS
  * ================================================================ */
@@ -109,7 +132,6 @@ static void set_status(const char *msg);
 static void append_log(const char *text);
 static void check_agent_status(XtPointer client_data, XtIntervalId *id);
 static void cleanup_and_exit(int code);
-static char *strcasestr(const char *haystack, const char *needle);
 
 /* ================================================================
  * INSTALL PROGRESS DIALOG
@@ -643,6 +665,9 @@ static void append_log(const char *text)
     XmTextShowPosition(info_text_w, XmTextGetLastPosition(info_text_w));
 }
 
+static void update_action_buttons(void);
+static void populate_version_dropdown(const char *pkg_name, int default_avail_idx);
+
 static void show_pkg_info(int avail_idx)
 {
     const avail_pkg_t *p;
@@ -650,11 +675,22 @@ static void show_pkg_info(int avail_idx)
 
     clear_info();
 
+    /* Reset selection state */
+    sel_is_installed = 0;
+    sel_inst_idx = -1;
+    sel_is_avail = 0;
+    sel_has_upgrade = 0;
+    sel_nversions = 0;
+    selected_version_idx = -1;
+
     /* Handle installed-only packages (negative index encoding) */
     if (avail_idx < 0) {
         int inst_idx = -(avail_idx + 1);
         if (inst_idx >= 0 && inst_idx < g_db->inst_count) {
             const installed_pkg_t *ip = &g_db->installed[inst_idx];
+            sel_is_installed = 1;
+            sel_inst_idx = inst_idx;
+            sel_is_avail = 0;
             snprintf(buf, sizeof(buf),
                 "Package: %s\n"
                 "Version: %s\n"
@@ -670,14 +706,50 @@ static void show_pkg_info(int avail_idx)
                 ip->name, ip->version, ip->pkg_code,
                 ip->repo_name, ip->install_date, ip->pkg_file);
             append_log(buf);
+            populate_version_dropdown(NULL, -1);
         }
+        update_action_buttons();
         return;
     }
 
-    if (avail_idx >= g_db->avail_count)
+    if (avail_idx >= g_db->avail_count) {
+        update_action_buttons();
         return;
+    }
 
     p = &g_db->available[avail_idx];
+    sel_is_avail = 1;
+
+    /* Check install state */
+    sel_inst_idx = pkgdb_find_installed(g_db, p->name);
+    sel_is_installed = (sel_inst_idx >= 0) ? 1 : 0;
+
+    /* Find all versions */
+    sel_nversions = pkgdb_find_all_versions(g_db, p->name,
+                                             sel_ver_list, 64);
+
+    /* Check if upgrade available */
+    if (sel_is_installed && sel_nversions > 0) {
+        const avail_pkg_t *latest = &g_db->available[sel_ver_list[0]];
+        const char *inst_ver = g_db->installed[sel_inst_idx].version;
+        if (strcmp(latest->version, inst_ver) != 0)
+            sel_has_upgrade = 1;
+    }
+
+    /* Default version selection: if installed, match installed version;
+     * otherwise use the latest (first in list) */
+    selected_version_idx = avail_idx;
+    if (sel_is_installed && sel_nversions > 0) {
+        int vi;
+        const char *inst_ver = g_db->installed[sel_inst_idx].version;
+        for (vi = 0; vi < sel_nversions; vi++) {
+            const avail_pkg_t *vp = &g_db->available[sel_ver_list[vi]];
+            if (strcmp(vp->version, inst_ver) == 0) {
+                selected_version_idx = sel_ver_list[vi];
+                break;
+            }
+        }
+    }
 
     snprintf(buf, sizeof(buf),
         "Package: %s\n"
@@ -706,10 +778,10 @@ static void show_pkg_info(int avail_idx)
     append_log("\nDependencies:\n");
     if (p->deps[0]) {
         char deps_copy[512];
-        char *tok;
+        char *tok, *saveptr;
         strncpy(deps_copy, p->deps, sizeof(deps_copy) - 1);
         deps_copy[sizeof(deps_copy) - 1] = '\0';
-        tok = strtok(deps_copy, ",");
+        tok = strtok_r(deps_copy, ",", &saveptr);
         while (tok) {
             int dep_idx;
             char dep_line[256];
@@ -717,7 +789,7 @@ static void show_pkg_info(int avail_idx)
 
             /* Skip self-reference (TGCware index includes pkg's own code) */
             if (strcmp(tok, p->pkg_code) == 0) {
-                tok = strtok(NULL, ",");
+                tok = strtok_r(NULL, ",", &saveptr);
                 continue;
             }
             dep_idx = pkgdb_find_by_code(g_db, tok);
@@ -735,48 +807,193 @@ static void show_pkg_info(int avail_idx)
                     is_inst ? " (installed)" : " (not found)");
             }
             append_log(dep_line);
-            tok = strtok(NULL, ",");
+            tok = strtok_r(NULL, ",", &saveptr);
         }
     } else {
         append_log("  (none)\n");
     }
 
     /* Check if installed */
-    {
-        int inst_idx;
-        inst_idx = pkgdb_find_installed(g_db, p->name);
-        if (inst_idx >= 0) {
-            snprintf(buf, sizeof(buf),
-                "\n--- Installed ---\n"
-                "Version: %s\n"
-                "Installed: %s\n"
-                "SVR4 Code: %s\n",
-                g_db->installed[inst_idx].version,
-                g_db->installed[inst_idx].install_date,
-                g_db->installed[inst_idx].pkg_code);
+    if (sel_is_installed) {
+        snprintf(buf, sizeof(buf),
+            "\n--- Installed ---\n"
+            "Version: %s\n"
+            "Installed: %s\n"
+            "SVR4 Code: %s\n",
+            g_db->installed[sel_inst_idx].version,
+            g_db->installed[sel_inst_idx].install_date,
+            g_db->installed[sel_inst_idx].pkg_code);
+        append_log(buf);
+    } else {
+        append_log("\nStatus: Not installed\n");
+    }
+
+    /* List all available versions */
+    if (sel_nversions > 1) {
+        int vi;
+        append_log("\nAvailable Versions:\n");
+        for (vi = 0; vi < sel_nversions; vi++) {
+            const avail_pkg_t *vp = &g_db->available[sel_ver_list[vi]];
+            int ver_inst = pkgdb_avail_is_installed(g_db, sel_ver_list[vi]);
+            snprintf(buf, sizeof(buf), "  %s-%d  [%s]%s%s\n",
+                vp->version, vp->release,
+                vp->pkg_code,
+                ver_inst ? " (installed)" : "",
+                sel_ver_list[vi] == avail_idx ? " *latest" : "");
             append_log(buf);
-        } else {
-            append_log("\nStatus: Not installed\n");
         }
     }
 
-    /* List all available versions (NuGet-style) */
+    /* Populate version dropdown */
+    populate_version_dropdown(p->name, selected_version_idx);
+
+    /* Update button sensitivity */
+    update_action_buttons();
+}
+
+/* ================================================================
+ * VERSION DROPDOWN & BUTTON STATE
+ * ================================================================ */
+
+/* Count how many installed packages have a newer version available */
+static int count_upgradable(void)
+{
+    int count = 0;
+    int i;
+    for (i = 0; i < g_db->inst_count; i++) {
+        const installed_pkg_t *ip = &g_db->installed[i];
+        int avail = pkgdb_find_avail(g_db, ip->name);
+        if (avail >= 0) {
+            const avail_pkg_t *ap = &g_db->available[avail];
+            if (strcmp(ap->version, ip->version) != 0)
+                count++;
+        }
+    }
+    return count;
+}
+
+/* Version dropdown selection callback */
+static void version_select_cb(Widget w, XtPointer client, XtPointer call)
+{
+    int idx = (int)(long)client;
+    (void)w; (void)call;
+
+    if (idx >= 0 && idx < version_count) {
+        selected_version_idx = version_indices[idx];
+    }
+}
+
+/* Populate the version dropdown for the selected package */
+static void populate_version_dropdown(const char *pkg_name, int default_avail_idx)
+{
+    int i;
+    int default_btn = 0;
+
+    /* Destroy old dropdown buttons */
+    for (i = 0; i < version_count; i++) {
+        if (version_buttons[i])
+            XtDestroyWidget(version_buttons[i]);
+        version_buttons[i] = NULL;
+    }
+    version_count = 0;
+
+    if (!pkg_name || !version_pulldown) {
+        /* No versions — hide/desensitize dropdown */
+        if (version_option_menu)
+            XtSetSensitive(version_option_menu, False);
+        return;
+    }
+
+    /* Find all versions */
     {
         int ver_list[64];
-        int nver, vi;
-        nver = pkgdb_find_all_versions(g_db, p->name, ver_list, 64);
-        if (nver > 1) {
-            append_log("\nAvailable Versions:\n");
-            for (vi = 0; vi < nver; vi++) {
-                const avail_pkg_t *vp = &g_db->available[ver_list[vi]];
-                int ver_inst = pkgdb_avail_is_installed(g_db, ver_list[vi]);
-                snprintf(buf, sizeof(buf), "  %s-%d  [%s]%s%s\n",
-                    vp->version, vp->release,
-                    vp->pkg_code,
-                    ver_inst ? " (installed)" : "",
-                    ver_list[vi] == avail_idx ? " *latest" : "");
-                append_log(buf);
-            }
+        int nver = pkgdb_find_all_versions(g_db, pkg_name, ver_list, 64);
+        if (nver <= 0) {
+            if (version_option_menu)
+                XtSetSensitive(version_option_menu, False);
+            return;
+        }
+
+        for (i = 0; i < nver && i < 64; i++) {
+            const avail_pkg_t *vp = &g_db->available[ver_list[i]];
+            char label[128];
+            XmString xs;
+
+            snprintf(label, sizeof(label), "%s-%d  (%s)",
+                     vp->version, vp->release, vp->repo_name);
+
+            xs = XmStringCreateLocalized(label);
+            version_buttons[i] = XtVaCreateManagedWidget(label,
+                xmPushButtonWidgetClass, version_pulldown,
+                XmNlabelString, xs,
+                NULL);
+            XmStringFree(xs);
+
+            XtAddCallback(version_buttons[i], XmNactivateCallback,
+                          version_select_cb, (XtPointer)(long)i);
+
+            version_indices[i] = ver_list[i];
+            if (ver_list[i] == default_avail_idx)
+                default_btn = i;
+        }
+        version_count = (nver < 64) ? nver : 64;
+    }
+
+    /* Set the default selection */
+    if (version_count > 0 && version_option_menu) {
+        XtVaSetValues(version_option_menu,
+            XmNmenuHistory, version_buttons[default_btn],
+            NULL);
+        XtSetSensitive(version_option_menu, (version_count > 1) ? True : False);
+        selected_version_idx = version_indices[default_btn];
+    }
+}
+
+/* Update action button sensitivity based on selection state */
+static void update_action_buttons(void)
+{
+    int upgradable;
+
+    if (g_selected < 0) {
+        /* Nothing selected — disable all per-package buttons */
+        if (install_btn) XtSetSensitive(install_btn, False);
+        if (remove_btn) XtSetSensitive(remove_btn, False);
+        if (upgrade_btn) XtSetSensitive(upgrade_btn, False);
+        if (deps_btn_w) XtSetSensitive(deps_btn_w, False);
+        if (version_option_menu) XtSetSensitive(version_option_menu, False);
+    } else {
+        /* Install: available in repo (even if installed — re-install) */
+        if (install_btn)
+            XtSetSensitive(install_btn, sel_is_avail ? True : False);
+
+        /* Remove: only if installed */
+        if (remove_btn)
+            XtSetSensitive(remove_btn, sel_is_installed ? True : False);
+
+        /* Upgrade: only if installed AND newer version exists */
+        if (upgrade_btn)
+            XtSetSensitive(upgrade_btn,
+                (sel_is_installed && sel_has_upgrade) ? True : False);
+
+        /* Deps: available in repo */
+        if (deps_btn_w)
+            XtSetSensitive(deps_btn_w, sel_is_avail ? True : False);
+    }
+
+    /* Upgrade All: visible when >1 package has an upgrade */
+    upgradable = count_upgradable();
+    if (upgrade_all_btn) {
+        if (upgradable > 1) {
+            char label[64];
+            XmString xs;
+            snprintf(label, sizeof(label), "Upgrade All (%d)", upgradable);
+            xs = XmStringCreateLocalized(label);
+            XtVaSetValues(upgrade_all_btn, XmNlabelString, xs, NULL);
+            XmStringFree(xs);
+            XtSetSensitive(upgrade_all_btn, True);
+            XtManageChild(upgrade_all_btn);
+        } else {
+            XtUnmanageChild(upgrade_all_btn);
         }
     }
 }
@@ -918,23 +1135,111 @@ static void populate_list(void)
 }
 
 /* ================================================================
- * strcasestr POLYFILL (not available on Solaris 7)
+ * CONFIRMATION DIALOG HELPERS
  * ================================================================ */
 
-static char *strcasestr(const char *haystack, const char *needle)
+/*
+ * Show a blocking Yes/No confirmation dialog.
+ * Returns 1 if user clicked OK/Yes, 0 if Cancel.
+ */
+static int g_confirm_result;
+
+static void confirm_ok_cb(Widget w, XtPointer client, XtPointer call)
 {
-    size_t nlen;
+    (void)w; (void)call;
+    g_confirm_result = 1;
+    XtDestroyWidget((Widget)client);
+}
 
-    if (!needle || !needle[0])
-        return (char *)haystack;
+static void confirm_cancel_cb(Widget w, XtPointer client, XtPointer call)
+{
+    (void)w; (void)call;
+    g_confirm_result = 0;
+    XtDestroyWidget((Widget)client);
+}
 
-    nlen = strlen(needle);
-    while (*haystack) {
-        if (strncasecmp(haystack, needle, nlen) == 0)
-            return (char *)haystack;
-        haystack++;
+static int show_confirm_dialog(const char *title, const char *message)
+{
+    Widget dialog;
+    XmString msg_xs, title_xs, ok_xs, cancel_xs;
+    XEvent event;
+
+    g_confirm_result = -1;
+
+    msg_xs = XmStringCreateLocalized((char *)message);
+    title_xs = XmStringCreateLocalized((char *)title);
+    ok_xs = XmStringCreateLocalized("OK");
+    cancel_xs = XmStringCreateLocalized("Cancel");
+
+    dialog = XmCreateQuestionDialog(top_shell, "confirmDialog", NULL, 0);
+    XtVaSetValues(dialog,
+        XmNmessageString, msg_xs,
+        XmNdialogTitle, title_xs,
+        XmNokLabelString, ok_xs,
+        XmNcancelLabelString, cancel_xs,
+        XmNdialogStyle, XmDIALOG_FULL_APPLICATION_MODAL,
+        NULL);
+
+    XmStringFree(msg_xs);
+    XmStringFree(title_xs);
+    XmStringFree(ok_xs);
+    XmStringFree(cancel_xs);
+
+    /* Hide Help button */
+    XtUnmanageChild(XmMessageBoxGetChild(dialog, XmDIALOG_HELP_BUTTON));
+
+    XtAddCallback(dialog, XmNokCallback,
+                  confirm_ok_cb, (XtPointer)dialog);
+    XtAddCallback(dialog, XmNcancelCallback,
+                  confirm_cancel_cb, (XtPointer)dialog);
+
+    XtManageChild(dialog);
+
+    /* Run a mini event loop until the dialog is dismissed */
+    while (g_confirm_result == -1) {
+        XtAppNextEvent(app_context, &event);
+        XtDispatchEvent(&event);
     }
-    return NULL;
+
+    return g_confirm_result;
+}
+
+/* Build a dependency list string for a package code */
+static void get_reverse_deps(const char *pkg_code, char *out, int out_size)
+{
+    int i;
+    char *p = out;
+    int remaining = out_size;
+    int first = 1;
+
+    out[0] = '\0';
+    for (i = 0; i < g_db->avail_count; i++) {
+        const avail_pkg_t *ap = &g_db->available[i];
+        if (!pkgdb_is_latest_version(g_db, i))
+            continue;
+        if (ap->deps[0] && strstr(ap->deps, pkg_code)) {
+            /* Verify it's an actual token match, not a substring */
+            char deps_copy[512];
+            char *tok, *saveptr;
+            strncpy(deps_copy, ap->deps, sizeof(deps_copy) - 1);
+            deps_copy[sizeof(deps_copy) - 1] = '\0';
+            tok = strtok_r(deps_copy, ",", &saveptr);
+            while (tok) {
+                while (*tok == ' ') tok++;
+                if (strcmp(tok, pkg_code) == 0) {
+                    int n = snprintf(p, remaining, "%s%s",
+                                     first ? "" : ", ", ap->name);
+                    if (n > 0 && n < remaining) {
+                        p += n;
+                        remaining -= n;
+                    }
+                    first = 0;
+                    break;
+                }
+                tok = strtok_r(NULL, ",", &saveptr);
+            }
+        }
+    }
 }
 
 /* ================================================================
@@ -1024,13 +1329,14 @@ static void update_cb(Widget w, XtPointer client, XtPointer call)
     set_status("Index updated.");
 }
 
-/* Install selected package */
+/* Install selected package (remove first if installed, then re-add) */
 static void install_cb(Widget w, XtPointer client, XtPointer call)
 {
     const avail_pkg_t *p;
-    char cmd[1024];
+    char cmd[2048];
     char title[256];
-    int map_val;
+    char msg[1024];
+    int use_idx;
 
     (void)w; (void)client; (void)call;
 
@@ -1039,24 +1345,87 @@ static void install_cb(Widget w, XtPointer client, XtPointer call)
         return;
     }
 
-    map_val = vis_map[g_selected];
-
-    /* Can't install installed-only packages (not in available index) */
-    if (map_val < 0) {
+    if (!sel_is_avail) {
         set_status("Package not in repository. Cannot install.");
         return;
     }
 
-    p = &g_db->available[map_val];
-
-    /* Check if already installed */
-    if (pkgdb_find_installed(g_db, p->name) >= 0) {
-        set_status("Package already installed.");
+    /* Use the version from the dropdown */
+    use_idx = (selected_version_idx >= 0) ? selected_version_idx : vis_map[g_selected];
+    if (use_idx < 0 || use_idx >= g_db->avail_count) {
+        set_status("Invalid version selection.");
         return;
     }
 
-    snprintf(title, sizeof(title), "Installing %s %s", p->name, p->version);
-    snprintf(cmd, sizeof(cmd), "spm install %s 2>&1", p->name);
+    p = &g_db->available[use_idx];
+
+    /* Check if this is an older version (not the latest) */
+    if (sel_is_installed || sel_nversions > 1) {
+        int is_latest = pkgdb_is_latest_version(g_db, use_idx);
+        int is_downgrade = 0;
+
+        /* Determine if installing an older version than what's installed */
+        if (sel_is_installed) {
+            const char *inst_ver = g_db->installed[sel_inst_idx].version;
+            /* Simple: if it's not the latest AND different from installed */
+            if (!is_latest && strcmp(p->version, inst_ver) != 0)
+                is_downgrade = 1;
+        } else if (!is_latest) {
+            is_downgrade = 1;
+        }
+
+        if (is_downgrade) {
+            /* Build reverse dependency list */
+            char rdeps[512];
+            get_reverse_deps(p->pkg_code, rdeps, sizeof(rdeps));
+
+            if (rdeps[0]) {
+                snprintf(msg, sizeof(msg),
+                    "You are installing an older version of %s (%s)\n"
+                    "that may be incompatible with other dependencies.\n\n"
+                    "Dependent packages: %s\n\n"
+                    "Continue?",
+                    p->name, p->version, rdeps);
+            } else {
+                snprintf(msg, sizeof(msg),
+                    "You are installing an older version of %s (%s)\n"
+                    "that may be incompatible with other dependencies.\n\n"
+                    "Continue?",
+                    p->name, p->version);
+            }
+
+            if (!show_confirm_dialog("Confirm Install", msg)) {
+                set_status("Install cancelled.");
+                return;
+            }
+        } else if (sel_is_installed) {
+            /* Re-installing same or newer — still confirm */
+            snprintf(msg, sizeof(msg),
+                "Re-install %s version %s?\n"
+                "The current installation will be removed first.",
+                p->name, p->version);
+            if (!show_confirm_dialog("Confirm Re-install", msg)) {
+                set_status("Install cancelled.");
+                return;
+            }
+        }
+    }
+
+    /* Build the command: remove first if installed, then install */
+    if (sel_is_installed) {
+        const char *pkg_code = g_db->installed[sel_inst_idx].pkg_code;
+        snprintf(title, sizeof(title), "Re-installing %s %s", p->name, p->version);
+        snprintf(cmd, sizeof(cmd),
+            "echo 'Removing current installation...'\n"
+            "spm remove %s 2>&1\n"
+            "echo ''\n"
+            "echo 'Installing %s %s...'\n"
+            "spm install %s 2>&1",
+            p->name, p->name, p->version, p->name);
+    } else {
+        snprintf(title, sizeof(title), "Installing %s %s", p->name, p->version);
+        snprintf(cmd, sizeof(cmd), "spm install %s 2>&1", p->name);
+    }
 
     set_status(title);
     run_in_progress_dialog(title, cmd);
@@ -1087,7 +1456,7 @@ static void remove_cb(Widget w, XtPointer client, XtPointer call)
         pkg_name = g_db->available[map_val].name;
     }
 
-    if (pkgdb_find_installed(g_db, pkg_name) < 0) {
+    if (!sel_is_installed) {
         set_status("Package not installed.");
         return;
     }
@@ -1099,29 +1468,76 @@ static void remove_cb(Widget w, XtPointer client, XtPointer call)
     run_in_progress_dialog(title, cmd);
 }
 
-/* Upgrade selected (or all) packages */
+/* Upgrade selected package (remove old, install latest) */
 static void upgrade_cb(Widget w, XtPointer client, XtPointer call)
 {
-    char cmd[1024];
+    char cmd[2048];
     char title[256];
+    const char *uname;
+    const avail_pkg_t *latest;
+    int avail;
 
     (void)w; (void)client; (void)call;
 
-    if (g_selected >= 0 && g_selected < vis_count) {
-        int map_val = vis_map[g_selected];
-        const char *uname;
-        if (map_val < 0) {
-            int inst_idx = -(map_val + 1);
-            uname = g_db->installed[inst_idx].name;
-        } else {
-            uname = g_db->available[map_val].name;
-        }
-        snprintf(title, sizeof(title), "Upgrading %s", uname);
-        snprintf(cmd, sizeof(cmd), "spm upgrade %s 2>&1", uname);
-    } else {
-        snprintf(title, sizeof(title), "Upgrading all packages");
-        snprintf(cmd, sizeof(cmd), "spm upgrade 2>&1");
+    if (g_selected < 0 || g_selected >= vis_count) {
+        set_status("No package selected.");
+        return;
     }
+
+    if (!sel_is_installed || !sel_has_upgrade) {
+        set_status("No upgrade available.");
+        return;
+    }
+
+    if (vis_map[g_selected] < 0) {
+        int inst_idx = -(vis_map[g_selected] + 1);
+        uname = g_db->installed[inst_idx].name;
+    } else {
+        uname = g_db->available[vis_map[g_selected]].name;
+    }
+
+    avail = pkgdb_find_avail(g_db, uname);
+    if (avail < 0) {
+        set_status("Package not in repository.");
+        return;
+    }
+    latest = &g_db->available[avail];
+
+    snprintf(title, sizeof(title), "Upgrading %s to %s",
+             uname, latest->version);
+
+    /* Remove then install (upgrade = remove old + install latest) */
+    snprintf(cmd, sizeof(cmd),
+        "echo 'Removing %s...'\n"
+        "spm remove %s 2>&1\n"
+        "echo ''\n"
+        "echo 'Installing %s %s...'\n"
+        "spm install %s 2>&1",
+        uname, uname, uname, latest->version, uname);
+
+    set_status(title);
+    run_in_progress_dialog(title, cmd);
+}
+
+/* Upgrade all packages */
+static void upgrade_all_cb(Widget w, XtPointer client, XtPointer call)
+{
+    char cmd[4096];
+    char title[128];
+    int n;
+
+    (void)w; (void)client; (void)call;
+
+    n = count_upgradable();
+    if (n == 0) {
+        set_status("All packages up to date.");
+        return;
+    }
+
+    snprintf(title, sizeof(title), "Upgrading %d packages", n);
+
+    /* Build a command that upgrades all via spm CLI */
+    snprintf(cmd, sizeof(cmd), "spm upgrade 2>&1");
 
     set_status(title);
     run_in_progress_dialog(title, cmd);
@@ -1293,7 +1709,6 @@ static void create_ui(void)
 {
     Widget form, left_pane, right_pane, paned;
     Widget toolbar, search_label;
-    Widget install_btn, remove_btn, upgrade_btn, deps_btn_w;
     Widget server_pulldown, settings_pulldown;
     Widget update_menu_btn, repos_menu_btn, about_menu_btn, quit_menu_btn;
     Widget pkgs_menu, tools_menu;
@@ -1502,6 +1917,40 @@ static void create_ui(void)
             xmPushButtonWidgetClass, btn_row, NULL);
         XtAddCallback(deps_btn_w, XmNactivateCallback,
                       deps_cb, NULL);
+
+        /* Version dropdown (OptionMenu + Pulldown) */
+        version_pulldown = XmCreatePulldownMenu(btn_row,
+            "versionPulldown", NULL, 0);
+        {
+            /* Create a placeholder button so the OptionMenu is valid */
+            XmString xs = XmStringCreateLocalized("(no package)");
+            version_buttons[0] = XtVaCreateManagedWidget("placeholder",
+                xmPushButtonWidgetClass, version_pulldown,
+                XmNlabelString, xs,
+                NULL);
+            XmStringFree(xs);
+            version_count = 1;
+            version_indices[0] = -1;
+        }
+        version_option_menu = XmCreateOptionMenu(btn_row,
+            "versionMenu", NULL, 0);
+        {
+            XmString xs = XmStringCreateLocalized("Version:");
+            XtVaSetValues(version_option_menu,
+                XmNsubMenuId, version_pulldown,
+                XmNlabelString, xs,
+                NULL);
+            XmStringFree(xs);
+        }
+        XtManageChild(version_option_menu);
+        XtSetSensitive(version_option_menu, False);
+
+        /* Upgrade All button (hidden until needed) */
+        upgrade_all_btn = XtVaCreateWidget("Upgrade All",
+            xmPushButtonWidgetClass, btn_row, NULL);
+        XtAddCallback(upgrade_all_btn, XmNactivateCallback,
+                      upgrade_all_cb, NULL);
+        /* Initially unmanaged — update_action_buttons will show it */
     }
 
     /* Bottom pane: info/log text area */
@@ -1851,6 +2300,56 @@ static int elevate_to_root(int *argc_p, char *argv[])
 }
 
 /* ================================================================
+ * STARTUP UPGRADE CHECK
+ * ================================================================ */
+
+static void check_startup_upgrades(void)
+{
+    int i, n;
+    char msg[4096];
+    int pos;
+
+    n = count_upgradable();
+    if (n == 0)
+        return;
+
+    /* Build a summary of upgradable packages */
+    pos = 0;
+    pos += snprintf(msg + pos, sizeof(msg) - pos,
+        "%d installed package%s %s newer version%s available:\n\n",
+        n, n == 1 ? "" : "s",
+        n == 1 ? "has a" : "have",
+        n == 1 ? "" : "s");
+
+    for (i = 0; i < g_db->inst_count && pos < (int)sizeof(msg) - 128; i++) {
+        const installed_pkg_t *ip = &g_db->installed[i];
+        int avail = pkgdb_find_avail(g_db, ip->name);
+        if (avail >= 0) {
+            const avail_pkg_t *ap = &g_db->available[avail];
+            if (strcmp(ap->version, ip->version) != 0) {
+                pos += snprintf(msg + pos, sizeof(msg) - pos,
+                    "  %s: %s -> %s\n",
+                    ip->name, ip->version, ap->version);
+            }
+        }
+    }
+
+    pos += snprintf(msg + pos, sizeof(msg) - pos,
+        "\nUpgrade now?");
+
+    if (show_confirm_dialog("Updates Available", msg)) {
+        char cmd[256];
+        char title[128];
+        snprintf(title, sizeof(title), "Upgrading %d packages", n);
+        snprintf(cmd, sizeof(cmd), "spm upgrade 2>&1");
+        set_status(title);
+        run_in_progress_dialog(title, cmd);
+        /* Refresh the package list after upgrade */
+        populate_list();
+    }
+}
+
+/* ================================================================
  * MAIN
  * ================================================================ */
 
@@ -1905,6 +2404,9 @@ int main(int argc, char *argv[])
 
     /* Realize and show */
     XtRealizeWidget(top_shell);
+
+    /* Check for upgradable packages on startup */
+    check_startup_upgrades();
 
     /* Start agent status check timer */
     agent_timer = XtAppAddTimeOut(app_context, 5000,

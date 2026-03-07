@@ -9,7 +9,7 @@
 PKGNAME="SSTspm"
 VERSION="0.1.0"
 BASEDIR="/opt/sst"
-SRCDIR=`pwd`
+SRCDIR=${SRCDIR:-`pwd`}
 BUILDDIR="/tmp/spm-build"
 STAGEDIR="/tmp/spm-stage"
 PKGDIR="/tmp/spm-pkg"
@@ -35,7 +35,7 @@ echo "--- Compiling ---"
 cp ${SRCDIR}/*.c ${SRCDIR}/*.h ${SRCDIR}/Makefile ${BUILDDIR}/
 cd ${BUILDDIR}
 make clean 2>/dev/null
-make
+make ${CC:+CC=$CC}
 if [ $? -ne 0 ]; then
     echo "BUILD FAILED"
     exit 1
@@ -116,7 +116,7 @@ CATEGORY=system
 VENDOR=Julian Wolfe
 EMAIL=
 PSTAMP=${PSTAMP}
-BASEDIR=${BASEDIR}
+BASEDIR=/
 CLASSES=none
 EOF
 
@@ -124,36 +124,31 @@ cp ${SRCDIR}/pkg/depend ${PKGDIR}/ 2>/dev/null
 cp ${SRCDIR}/pkg/postinstall ${PKGDIR}/
 cp ${SRCDIR}/pkg/preremove ${PKGDIR}/
 
-# Build prototype
+# Build prototype — all absolute paths, root = STAGEDIR
 cat > ${PKGDIR}/prototype <<PROTO
 i pkginfo
 i postinstall
 i preremove
-d none bin 0755 root bin
-f none bin/spm 0755 root bin
-f none bin/spm-gui 0755 root bin
-f none bin/spm-agent 0755 root bin
-d none etc 0755 root bin
-f none etc/repos.conf 0644 root bin
-d none var 0755 root bin
-d none var/cache 0755 root bin
-d none var/index 0755 root bin
-d none var/rollback 0755 root bin
-d none man 0755 root bin
-d none man/man1m 0755 root bin
-f none man/man1m/spm.1m 0644 root bin
-PROTO
-
-# Add CDE integration files (absolute paths, outside BASEDIR)
-cat >> ${PKGDIR}/prototype <<DTPROTO
-!search ${STAGEDIR}
+d none ${BASEDIR}/bin 0755 root bin
+f none ${BASEDIR}/bin/spm 0755 root bin
+f none ${BASEDIR}/bin/spm-gui 0755 root bin
+f none ${BASEDIR}/bin/spm-agent 0755 root bin
+d none ${BASEDIR}/etc 0755 root bin
+f none ${BASEDIR}/etc/repos.conf 0644 root bin
+d none ${BASEDIR}/var 0755 root bin
+d none ${BASEDIR}/var/cache 0755 root bin
+d none ${BASEDIR}/var/index 0755 root bin
+d none ${BASEDIR}/var/rollback 0755 root bin
+d none ${BASEDIR}/man 0755 root bin
+d none ${BASEDIR}/man/man1m 0755 root bin
+f none ${BASEDIR}/man/man1m/spm.1m 0644 root bin
 d none /usr/dt/appconfig/types/C 0755 root bin
 f none /usr/dt/appconfig/types/C/spm.dt 0644 root bin
 d none /usr/dt/appconfig/icons/C 0755 root bin
 f none /usr/dt/appconfig/icons/C/Spm.l.pm 0644 root bin
 f none /usr/dt/appconfig/icons/C/Spm.m.pm 0644 root bin
 f none /usr/dt/appconfig/icons/C/Spm.l.bm 0644 root bin
-DTPROTO
+PROTO
 
 # Add depend if present
 if [ -f ${PKGDIR}/depend ]; then
@@ -162,7 +157,7 @@ fi
 
 # Add README if staged
 if [ -f ${STAGEDIR}${BASEDIR}/README.md ]; then
-    echo "f none README.md 0644 root bin" >> ${PKGDIR}/prototype
+    echo "f none ${BASEDIR}/README.md 0644 root bin" >> ${PKGDIR}/prototype
 fi
 
 echo "Prototype:"
@@ -171,7 +166,11 @@ echo ""
 
 # Build package
 echo "--- Building package ---"
-pkgmk -o -r ${STAGEDIR}${BASEDIR} -d /tmp/spm-spool -f ${PKGDIR}/prototype
+pkgmk -o -r ${STAGEDIR} -d /tmp/spm-spool -f ${PKGDIR}/prototype
+if [ $? -ne 0 ]; then
+    echo "PACKAGING FAILED"
+    exit 1
+fi
 
 # Convert to datastream
 echo "--- Creating datastream package ---"

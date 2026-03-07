@@ -27,9 +27,9 @@ SSTDIR = /opt/sst
 MOTIFDIR = /usr/dt
 OPENWINDIR = /usr/openwin
 
-CFLAGS = -O2 -Wall -I$(TGCWARE)/include -I$(SSTDIR)/include
+CFLAGS = -O2 -Wall -D_REENTRANT -I$(TGCWARE)/include -I$(SSTDIR)/include
 LDFLAGS = -s -L$(SSTDIR)/lib -R$(SSTDIR)/lib -L$(TGCWARE)/lib -R$(TGCWARE)/lib
-LIBS = -lsocket -lnsl -ldl
+LIBS = -lsolcompat -lsocket -lnsl -ldl
 
 # Motif/X11 link flags (GUI only)
 MOTIF_CFLAGS = -I$(MOTIFDIR)/include -I$(OPENWINDIR)/include

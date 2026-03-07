@@ -23,68 +23,73 @@ Part of the [Sunstorm](https://github.com/firefly128/sunstorm) distribution.
 - **Motif/CDE GUI** — Graphical package manager with search, install, remove, and upgrade
 - **Background agent** — Daemon that periodically checks for updates, started on boot
 
-## Requirements
+## Installation
 
-- Solaris 7 (SunOS 5.7) on SPARC
-- OpenSSL — Sunstorm (`/opt/sst/lib/libssl.so`) or TGCware (`/usr/tgcware/lib/libssl.so`)
-- CA certificate bundle (`/opt/sst/etc/ssl/certs/ca-bundle.crt` or TGCware equivalent)
-- CDE/Motif (for GUI: `/usr/dt/lib/libXm.so`, `/usr/openwin/lib/libX11.so`)
-- Network access to the internet (DNS + HTTPS)
+### Bootstrap package (recommended)
 
-For building from source: TGCware GCC 4.7+ (`/usr/tgcware/gcc47/bin/gcc`).
+The bootstrap package is a single self-contained SVR4 package that includes
+spm and all its dependencies (OpenSSL, zlib, libsolcompat, prngd, wget).
+No prerequisites needed — just a base Solaris 7 SPARC install.
 
-## Bootstrap
-
-spm requires OpenSSL for HTTPS, but OpenSSL itself is a Sunstorm package.
-To break this circular dependency, the Sunstorm project provides a
-**bootstrap bundle** — a tarball containing the 5 prerequisite packages
-that can be installed using only base Solaris tools:
-
-```
-SSTzlib   → zlib compression library
-SSTlsolc  → POSIX/C99 compatibility shim (libsolcompat)
-SSTprngd  → Pseudo-random number generator daemon
-SSTossl   → OpenSSL cryptography toolkit
-SSTspm    → Sunstorm Package Manager (this package)
-```
-
-### Installing from the bootstrap bundle
+Download `SSTspm-0.1.0-bootstrap-sparc.pkg.Z` from the
+[Releases](https://github.com/firefly128/spm/releases) page, transfer it
+to the Solaris system, then:
 
 ```sh
-# Transfer sunstorm-bootstrap-1.0.0.tar.Z to the Solaris system, then:
-uncompress sunstorm-bootstrap-1.0.0.tar.Z
-tar xf sunstorm-bootstrap-1.0.0.tar
-cd sunstorm-bootstrap-1.0.0
-sh sunstorm-bootstrap.sh
+uncompress SSTspm-0.1.0-bootstrap-sparc.pkg.Z
+pkgadd -d SSTspm-0.1.0-bootstrap-sparc.pkg
 ```
 
-The script installs all 5 packages in dependency order using `pkgadd`,
-starts `prngd`, and verifies the installation. After bootstrap:
+The postinstall script starts `prngd` (for SSL entropy), sets up init scripts,
+and adds `/opt/sst/bin` and `/opt/sst/lib` to your PATH and LD_LIBRARY_PATH
+in `/etc/profile`. After install:
 
 ```sh
+# If in an existing shell, set up the environment:
+LD_LIBRARY_PATH=/opt/sst/lib; export LD_LIBRARY_PATH
 PATH=/opt/sst/bin:$PATH; export PATH
+
 spm update
 spm install bash gcc curl   # install anything you need
 ```
 
-See the [Sunstorm](https://github.com/firefly128/sunstorm) repo for
-bootstrap bundle downloads and the full package list.
+### From the Sunstorm distribution
 
-## Building
+If you already have the [Sunstorm](https://github.com/firefly128/sunstorm)
+packages installed, spm is included as `SSTspm` along with its dependencies.
+See the Sunstorm repo for the full package list.
+
+## Requirements
+
+- Solaris 7 (SunOS 5.7) on SPARC
+- CDE/Motif (for GUI: standard Solaris install includes these)
+- Network access to the internet (DNS + HTTPS)
+
+The bootstrap package bundles all other dependencies. If installing the
+regular (non-bootstrap) `SSTspm`, you also need:
+- OpenSSL — Sunstorm (`/opt/sst/lib/libssl.so`) or TGCware (`/usr/tgcware/lib/libssl.so`)
+- libsolcompat, libgcc_s, zlib, prngd (all provided by Sunstorm)
+
+For building from source: Sunstorm GCC 11 (`/opt/sst/bin/gcc`) or TGCware GCC 4.7+.
+
+## Building from source
 
 ```sh
-# On the SPARCstation
-make          # builds all three: spm, spm-gui, spm-agent
-make install
+# On the SPARCstation (requires GCC and libsolcompat)
+CC=/opt/sst/bin/gcc make    # builds spm, spm-gui, spm-agent
 
 # Build individual targets
 make cli      # CLI only
 make gui      # GUI only
 make agent    # Agent only
 
-# Or build an SVR4 package
-sh build-pkg.sh
-pkgadd -d spm-0.1.0-sparc.pkg
+# Build an SVR4 package
+CC=/opt/sst/bin/gcc sh build-pkg.sh
+# Produces: SSTspm-0.1.0-sparc.pkg
+
+# Build the self-contained bootstrap package
+CC=/opt/sst/bin/gcc sh build-bootstrap-pkg.sh
+# Produces: SSTspm-0.1.0-bootstrap-sparc.pkg.Z
 ```
 
 ## Usage
@@ -308,8 +313,15 @@ repository. Use `spm info <pkg>` to see the source URL.
 
 ## SVR4 Package
 
-spm itself is distributed as an SVR4 package (`SSTspm`). Build it with
-`sh build-pkg.sh` on any Solaris 7 SPARC system with TGCware GCC installed.
+spm is distributed as an SVR4 package (`SSTspm`). Two variants exist:
+
+- **Bootstrap** (`SSTspm-0.1.0-bootstrap-sparc.pkg.Z`) — Self-contained,
+  bundles all dependencies. For fresh Solaris 7 installs.
+- **Regular** (`SSTspm-0.1.0-sparc.pkg.Z`) — Minimal, depends on separately
+  installed SSTossl, SSTzlib, SSTlsolc, SSTprngd. Included in the Sunstorm distro.
+
+Build either with `sh build-pkg.sh` or `sh build-bootstrap-pkg.sh` on a
+Solaris 7 SPARC system with Sunstorm GCC installed.
 
 ## License
 

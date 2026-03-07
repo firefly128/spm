@@ -1085,7 +1085,7 @@ int *pkgdb_resolve_deps(pkgdb_t *db, int avail_idx, int *count)
     int *result = NULL;
     int alloc = 0, n = 0;
     char deps_copy[512];
-    char *tok;
+    char *tok, *saveptr;
 
     *count = 0;
     if (avail_idx < 0 || avail_idx >= db->avail_count) return NULL;
@@ -1096,7 +1096,7 @@ int *pkgdb_resolve_deps(pkgdb_t *db, int avail_idx, int *count)
     strncpy(deps_copy, pkg->deps, sizeof(deps_copy) - 1);
     deps_copy[sizeof(deps_copy) - 1] = '\0';
 
-    tok = strtok(deps_copy, ",");
+    tok = strtok_r(deps_copy, ",", &saveptr);
     while (tok) {
         /* Trim whitespace */
         while (*tok == ' ') tok++;
@@ -1107,7 +1107,7 @@ int *pkgdb_resolve_deps(pkgdb_t *db, int avail_idx, int *count)
 
         /* Skip self-reference (TGCware index includes pkg's own code) */
         if (*tok && strcmp(tok, pkg->pkg_code) == 0) {
-            tok = strtok(NULL, ",");
+            tok = strtok_r(NULL, ",", &saveptr);
             continue;
         }
 
@@ -1160,7 +1160,7 @@ int *pkgdb_resolve_deps(pkgdb_t *db, int avail_idx, int *count)
                 }
             }
         }
-        tok = strtok(NULL, ",");
+        tok = strtok_r(NULL, ",", &saveptr);
     }
 
     *count = n;
@@ -1171,7 +1171,7 @@ void pkgdb_print_deps(const pkgdb_t *db, int avail_idx, int depth)
 {
     const avail_pkg_t *pkg;
     char deps_copy[512];
-    char *tok;
+    char *tok, *saveptr;
     int i;
 
     if (avail_idx < 0 || avail_idx >= db->avail_count) return;
@@ -1193,12 +1193,12 @@ void pkgdb_print_deps(const pkgdb_t *db, int avail_idx, int depth)
     strncpy(deps_copy, pkg->deps, sizeof(deps_copy) - 1);
     deps_copy[sizeof(deps_copy) - 1] = '\0';
 
-    tok = strtok(deps_copy, ",");
+    tok = strtok_r(deps_copy, ",", &saveptr);
     while (tok) {
         while (*tok == ' ') tok++;
         /* Skip self-reference (TGCware index includes pkg's own code) */
         if (*tok && strcmp(tok, pkg->pkg_code) == 0) {
-            tok = strtok(NULL, ",");
+            tok = strtok_r(NULL, ",", &saveptr);
             continue;
         }
         if (*tok) {
@@ -1215,6 +1215,6 @@ void pkgdb_print_deps(const pkgdb_t *db, int avail_idx, int depth)
                 printf("\n");
             }
         }
-        tok = strtok(NULL, ",");
+        tok = strtok_r(NULL, ",", &saveptr);
     }
 }
