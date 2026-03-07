@@ -1,27 +1,27 @@
 /*
- * config.h - Configuration management for solpkg
+ * config.h - Configuration management for spm
  *
- * Reads/writes the master repo config from /opt/solpkg/etc/repos.conf
+ * Reads/writes the master repo config from /opt/sst/etc/repos.conf
  * and manages SSL settings, repository definitions, and paths.
  */
 
-#ifndef SOLPKG_CONFIG_H
-#define SOLPKG_CONFIG_H
+#ifndef SPM_CONFIG_H
+#define SPM_CONFIG_H
 
-#define SOLPKG_VERSION   "0.1.0"
-#define SOLPKG_BASE      "/opt/solpkg"
-#define SOLPKG_ETC       SOLPKG_BASE "/etc"
-#define SOLPKG_VAR       SOLPKG_BASE "/var"
-#define SOLPKG_CACHE     SOLPKG_VAR  "/cache"
-#define SOLPKG_ROLLBACK  SOLPKG_VAR  "/rollback"
-#define SOLPKG_CONF      SOLPKG_ETC  "/repos.conf"
-#define SOLPKG_INSTALLED SOLPKG_VAR  "/installed.db"
-#define SOLPKG_IDX_DIR   SOLPKG_VAR  "/index"
-#define SOLPKG_AGENT_PID SOLPKG_VAR  "/agent.pid"
-#define SOLPKG_AGENT_LOG SOLPKG_VAR  "/agent.log"
-#define SOLPKG_UPDATE_STATUS SOLPKG_VAR "/update.status"
+#define SPM_VERSION   "0.1.0"
+#define SPM_BASE      "/opt/sst"
+#define SPM_ETC       SPM_BASE "/etc"
+#define SPM_VAR       SPM_BASE "/var"
+#define SPM_CACHE     SPM_VAR  "/cache"
+#define SPM_ROLLBACK  SPM_VAR  "/rollback"
+#define SPM_CONF      SPM_ETC  "/repos.conf"
+#define SPM_INSTALLED SPM_VAR  "/installed.db"
+#define SPM_IDX_DIR   SPM_VAR  "/index"
+#define SPM_AGENT_PID SPM_VAR  "/agent.pid"
+#define SPM_AGENT_LOG SPM_VAR  "/agent.log"
+#define SPM_UPDATE_STATUS SPM_VAR "/update.status"
 
-#define SOLPKG_CA_BUNDLE "/usr/tgcware/etc/curl-ca-bundle.pem"
+#define SPM_CA_BUNDLE "/usr/tgcware/etc/curl-ca-bundle.pem"
 
 #define REPO_TYPE_TGCWARE   1
 #define REPO_TYPE_GITHUB    2
@@ -58,27 +58,27 @@ typedef struct {
 
     repo_def_t repos[MAX_REPOS];
     int repo_count;
-} solpkg_config_t;
+} spm_config_t;
 
 /*
- * Load config from SOLPKG_CONF.
+ * Load config from SPM_CONF.
  * Returns 0 on success, -1 on error (creates defaults if missing).
  */
-int config_load(solpkg_config_t *cfg);
+int config_load(spm_config_t *cfg);
 
 /*
- * Save config to SOLPKG_CONF.
+ * Save config to SPM_CONF.
  * Returns 0 on success, -1 on error.
  */
-int config_save(const solpkg_config_t *cfg);
+int config_save(const spm_config_t *cfg);
 
 /*
  * Initialize default config (TGCware + firefly128 repos).
  */
-void config_defaults(solpkg_config_t *cfg);
+void config_defaults(spm_config_t *cfg);
 
 /*
- * Create required directories under SOLPKG_BASE.
+ * Create required directories under SPM_BASE.
  */
 int config_init_dirs(void);
 
@@ -86,6 +86,6 @@ int config_init_dirs(void);
  * Find a repo by name.
  * Returns pointer to the repo, or NULL.
  */
-repo_def_t *config_find_repo(solpkg_config_t *cfg, const char *name);
+repo_def_t *config_find_repo(spm_config_t *cfg, const char *name);
 
-#endif /* SOLPKG_CONFIG_H */
+#endif /* SPM_CONFIG_H */

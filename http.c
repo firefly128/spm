@@ -43,15 +43,15 @@ typedef struct ssl_st SSL;
 typedef struct ssl_method_st SSL_METHOD;
 
 /* OpenSSL constants */
-#define SOLPKG_SSL_OP_NO_SSLv2              0x01000000L
-#define SOLPKG_SSL_OP_NO_SSLv3              0x02000000L
-#define SOLPKG_SSL_VERIFY_NONE              0
-#define SOLPKG_SSL_VERIFY_PEER              1
-#define SOLPKG_SSL_CTRL_OPTIONS             32
-#define SOLPKG_SSL_CTRL_SET_TLSEXT_HOSTNAME 55
-#define SOLPKG_X509_V_OK                    0
-#define SOLPKG_INIT_LOAD_SSL_STRINGS        0x00200000L
-#define SOLPKG_INIT_LOAD_CRYPTO_STRINGS     0x02000000L
+#define SPM_SSL_OP_NO_SSLv2              0x01000000L
+#define SPM_SSL_OP_NO_SSLv3              0x02000000L
+#define SPM_SSL_VERIFY_NONE              0
+#define SPM_SSL_VERIFY_PEER              1
+#define SPM_SSL_CTRL_OPTIONS             32
+#define SPM_SSL_CTRL_SET_TLSEXT_HOSTNAME 55
+#define SPM_X509_V_OK                    0
+#define SPM_INIT_LOAD_SSL_STRINGS        0x00200000L
+#define SPM_INIT_LOAD_CRYPTO_STRINGS     0x02000000L
 
 /* Function pointer types */
 typedef int          (*pfn_OPENSSL_init_ssl)(unsigned long long, void *);
@@ -108,7 +108,7 @@ static int ssl_loaded = 0;
 #define LOAD_SYM(h, name) do { \
     dl_##name = (pfn_##name)dlsym(h, #name); \
     if (!dl_##name) { \
-        fprintf(stderr, "solpkg: dlsym(%s): %s\n", #name, dlerror()); \
+        fprintf(stderr, "spm: dlsym(%s): %s\n", #name, dlerror()); \
         return -1; \
     } \
 } while(0)
@@ -122,7 +122,7 @@ static int load_openssl(void)
     if (!crypto_lib_handle)
         crypto_lib_handle = dlopen("libcrypto.so", RTLD_NOW | RTLD_GLOBAL);
     if (!crypto_lib_handle) {
-        fprintf(stderr, "solpkg: cannot load libcrypto: %s\n", dlerror());
+        fprintf(stderr, "spm: cannot load libcrypto: %s\n", dlerror());
         return -1;
     }
 
@@ -130,7 +130,7 @@ static int load_openssl(void)
     if (!ssl_lib_handle)
         ssl_lib_handle = dlopen("libssl.so", RTLD_NOW | RTLD_GLOBAL);
     if (!ssl_lib_handle) {
-        fprintf(stderr, "solpkg: cannot load libssl: %s\n", dlerror());
+        fprintf(stderr, "spm: cannot load libssl: %s\n", dlerror());
         return -1;
     }
 
@@ -148,7 +148,7 @@ static int load_openssl(void)
     if (!dl_TLS_client_method)
         dl_TLS_client_method = (pfn_TLS_client_method)dlsym(ssl_lib_handle, "SSLv23_client_method");
     if (!dl_TLS_client_method) {
-        fprintf(stderr, "solpkg: cannot find TLS_client_method or SSLv23_client_method\n");
+        fprintf(stderr, "spm: cannot find TLS_client_method or SSLv23_client_method\n");
         return -1;
     }
 
@@ -200,8 +200,8 @@ int http_init(void)
     if (dl_OPENSSL_init_ssl) {
         /* OpenSSL 3.x */
         dl_OPENSSL_init_ssl(
-            SOLPKG_INIT_LOAD_SSL_STRINGS |
-            SOLPKG_INIT_LOAD_CRYPTO_STRINGS, NULL);
+            SPM_INIT_LOAD_SSL_STRINGS |
+            SPM_INIT_LOAD_CRYPTO_STRINGS, NULL);
     } else {
         /* OpenSSL 1.0.x */
         if (dl_SSL_library_init) dl_SSL_library_init();
@@ -211,14 +211,14 @@ int http_init(void)
 
     g_ssl_ctx = dl_SSL_CTX_new(dl_TLS_client_method());
     if (!g_ssl_ctx) {
-        fprintf(stderr, "solpkg: SSL_CTX_new failed\n");
+        fprintf(stderr, "spm: SSL_CTX_new failed\n");
         dl_ERR_print_errors_fp(stderr);
         return -1;
     }
 
     /* Disable old protocols, allow TLS 1.0+ */
-    dl_SSL_CTX_ctrl(g_ssl_ctx, SOLPKG_SSL_CTRL_OPTIONS,
-                    SOLPKG_SSL_OP_NO_SSLv2 | SOLPKG_SSL_OP_NO_SSLv3, NULL);
+    dl_SSL_CTX_ctrl(g_ssl_ctx, SPM_SSL_CTRL_OPTIONS,
+                    SPM_SSL_OP_NO_SSLv2 | SPM_SSL_OP_NO_SSLv3, NULL);
 
     /* Load CA certificates for verification */
     if (dl_SSL_CTX_load_verify_locations(g_ssl_ctx, g_ca_bundle, NULL) != 1) {
@@ -229,17 +229,17 @@ int http_init(void)
                 "/usr/tgcware/share/curl/curl-ca-bundle.crt", NULL) != 1) {
             if (dl_SSL_CTX_load_verify_locations(g_ssl_ctx,
                     "/etc/ssl/certs/ca-certificates.crt", NULL) != 1) {
-                fprintf(stderr, "solpkg: warning: cannot load CA certs\n");
+                fprintf(stderr, "spm: warning: cannot load CA certs\n");
                 fprintf(stderr, "  tried: %s\n", g_ca_bundle);
                 fprintf(stderr, "  HTTPS verification disabled\n");
-                dl_SSL_CTX_set_verify(g_ssl_ctx, SOLPKG_SSL_VERIFY_NONE, NULL);
+                dl_SSL_CTX_set_verify(g_ssl_ctx, SPM_SSL_VERIFY_NONE, NULL);
                 return 0;
               }
             }
         }
     }
 
-    dl_SSL_CTX_set_verify(g_ssl_ctx, SOLPKG_SSL_VERIFY_PEER, NULL);
+    dl_SSL_CTX_set_verify(g_ssl_ctx, SPM_SSL_VERIFY_PEER, NULL);
     return 0;
 }
 
@@ -404,7 +404,7 @@ static http_conn_t *conn_open(const char *host, int port, int use_ssl)
 
     if (use_ssl) {
         if (!g_ssl_ctx) {
-            fprintf(stderr, "solpkg: SSL not initialized\n");
+            fprintf(stderr, "spm: SSL not initialized\n");
             close(fd); free(c);
             return NULL;
         }
@@ -415,10 +415,10 @@ static http_conn_t *conn_open(const char *host, int port, int use_ssl)
         dl_SSL_set_fd(c->ssl, fd);
 
         /* SNI: set hostname for virtual hosts */
-        dl_SSL_ctrl(c->ssl, SOLPKG_SSL_CTRL_SET_TLSEXT_HOSTNAME, 0, (void *)host);
+        dl_SSL_ctrl(c->ssl, SPM_SSL_CTRL_SET_TLSEXT_HOSTNAME, 0, (void *)host);
 
         if (dl_SSL_connect(c->ssl) != 1) {
-            fprintf(stderr, "solpkg: SSL handshake failed to %s:%d\n",
+            fprintf(stderr, "spm: SSL handshake failed to %s:%d\n",
                     host, port);
             dl_ERR_print_errors_fp(stderr);
             dl_SSL_free(c->ssl);
@@ -426,8 +426,8 @@ static http_conn_t *conn_open(const char *host, int port, int use_ssl)
             return NULL;
         }
 
-        if (dl_SSL_get_verify_result(c->ssl) != SOLPKG_X509_V_OK) {
-            fprintf(stderr, "solpkg: warning: cert verification failed for %s\n",
+        if (dl_SSL_get_verify_result(c->ssl) != SPM_X509_V_OK) {
+            fprintf(stderr, "spm: warning: cert verification failed for %s\n",
                     host);
         }
     }
@@ -609,7 +609,7 @@ static int do_http_get(const char *url, http_response_t *resp, int depth)
 
     c = conn_open(u.host, u.port, use_ssl);
     if (!c) {
-        fprintf(stderr, "solpkg: cannot connect to %s:%d%s\n",
+        fprintf(stderr, "spm: cannot connect to %s:%d%s\n",
                 u.host, u.port, use_ssl ? " (SSL)" : "");
         return -1;
     }
@@ -617,11 +617,11 @@ static int do_http_get(const char *url, http_response_t *resp, int depth)
     hlen = snprintf(header, sizeof(header),
         "GET %s HTTP/1.0\r\n"
         "Host: %s\r\n"
-        "User-Agent: solpkg/%s (SunOS 5.7 SPARC)\r\n"
+        "User-Agent: spm/%s (SunOS 5.7 SPARC)\r\n"
         "Accept: */*\r\n"
         "Connection: close\r\n"
         "\r\n",
-        u.path, u.host, SOLPKG_VERSION);
+        u.path, u.host, SPM_VERSION);
 
     if (conn_send(c, header, hlen) < 0) { conn_close(c); return -1; }
 
@@ -694,18 +694,18 @@ static int do_http_download(const char *url, const char *dest_path,
 
     c = conn_open(u.host, u.port, use_ssl);
     if (!c) {
-        fprintf(stderr, "solpkg: cannot connect to %s:%d\n", u.host, u.port);
+        fprintf(stderr, "spm: cannot connect to %s:%d\n", u.host, u.port);
         return -1;
     }
 
     hlen = snprintf(header, sizeof(header),
         "GET %s HTTP/1.0\r\n"
         "Host: %s\r\n"
-        "User-Agent: solpkg/%s (SunOS 5.7 SPARC)\r\n"
+        "User-Agent: spm/%s (SunOS 5.7 SPARC)\r\n"
         "Accept: */*\r\n"
         "Connection: close\r\n"
         "\r\n",
-        u.path, u.host, SOLPKG_VERSION);
+        u.path, u.host, SPM_VERSION);
 
     if (conn_send(c, header, hlen) < 0) { conn_close(c); return -1; }
 
@@ -767,7 +767,7 @@ static int do_http_download(const char *url, const char *dest_path,
         }
 
         if (status < 200 || status >= 300) {
-            fprintf(stderr, "solpkg: HTTP %d for %s\n", status, url);
+            fprintf(stderr, "spm: HTTP %d for %s\n", status, url);
             free(hdr_buf); conn_close(c);
             return -1;
         }
@@ -780,7 +780,7 @@ static int do_http_download(const char *url, const char *dest_path,
 
     out_fd = open(dest_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (out_fd < 0) {
-        fprintf(stderr, "solpkg: cannot create %s: %s\n", dest_path, strerror(errno));
+        fprintf(stderr, "spm: cannot create %s: %s\n", dest_path, strerror(errno));
         free(hdr_buf); conn_close(c);
         return -1;
     }
@@ -809,7 +809,7 @@ static int do_http_download(const char *url, const char *dest_path,
     close(out_fd);
 
     if (content_length > 0 && total_recv < content_length) {
-        fprintf(stderr, "solpkg: incomplete download (%ld/%ld bytes)\n",
+        fprintf(stderr, "spm: incomplete download (%ld/%ld bytes)\n",
                 total_recv, content_length);
         unlink(dest_path);
         return -1;

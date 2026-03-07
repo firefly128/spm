@@ -237,11 +237,11 @@ int pkgdb_save_index(const pkgdb_t *db)
     int i;
     char path[512];
 
-    snprintf(path, sizeof(path), "%s/available.idx", SOLPKG_IDX_DIR);
+    snprintf(path, sizeof(path), "%s/available.idx", SPM_IDX_DIR);
     f = fopen(path, "w");
     if (!f) return -1;
 
-    fprintf(f, "# solpkg available package index\n");
+    fprintf(f, "# spm available package index\n");
     fprintf(f, "# name|version|release|arch|pkg_code|desc|download|"
                "filename|md5|deps|size|repo|src_type|src_url|src_repo\n");
 
@@ -303,7 +303,7 @@ int pkgdb_load_index(pkgdb_t *db)
     char line[4096];
     char path[512];
 
-    snprintf(path, sizeof(path), "%s/available.idx", SOLPKG_IDX_DIR);
+    snprintf(path, sizeof(path), "%s/available.idx", SPM_IDX_DIR);
     f = fopen(path, "r");
     if (!f) return -1;
 
@@ -326,10 +326,10 @@ int pkgdb_save_installed(const pkgdb_t *db)
     FILE *f;
     int i;
 
-    f = fopen(SOLPKG_INSTALLED, "w");
+    f = fopen(SPM_INSTALLED, "w");
     if (!f) return -1;
 
-    fprintf(f, "# solpkg installed packages\n");
+    fprintf(f, "# spm installed packages\n");
     for (i = 0; i < db->inst_count; i++) {
         const installed_pkg_t *p = &db->installed[i];
         fprintf(f, "%s|%s|%s|%s|%s|%s|%d\n",
@@ -744,11 +744,11 @@ static const char *pkgadd_admin_file(void)
 
     if (admin_path[0]) return admin_path;
 
-    snprintf(admin_path, sizeof(admin_path), "%s/admin", SOLPKG_VAR);
+    snprintf(admin_path, sizeof(admin_path), "%s/admin", SPM_VAR);
     f = fopen(admin_path, "w");
     if (!f) {
         /* fallback: use /tmp */
-        snprintf(admin_path, sizeof(admin_path), "/tmp/solpkg-admin");
+        snprintf(admin_path, sizeof(admin_path), "/tmp/spm-admin");
         f = fopen(admin_path, "w");
     }
     if (f) {
@@ -826,7 +826,7 @@ int pkgdb_install(pkgdb_t *db, int avail_idx)
 
     /* Build cache path */
     snprintf(cache_path, sizeof(cache_path), "%s/%s",
-             SOLPKG_CACHE, pkg->filename);
+             SPM_CACHE, pkg->filename);
 
     /* Check if already cached */
     {
@@ -837,7 +837,7 @@ int pkgdb_install(pkgdb_t *db, int avail_idx)
             printf("  Downloading %s (%s)...\n", pkg->filename, pkg->size_str);
             if (http_download(pkg->download_url, cache_path,
                               download_progress) < 0) {
-                fprintf(stderr, "\nsolpkg: download failed: %s\n",
+                fprintf(stderr, "\nspm: download failed: %s\n",
                         pkg->download_url);
                 return -1;
             }
@@ -851,7 +851,7 @@ int pkgdb_install(pkgdb_t *db, int avail_idx)
     if (pkg->source_type == SRC_TGCWARE) {
         char uncompressed[512];
         snprintf(uncompressed, sizeof(uncompressed), "%s/%s.unpacked",
-                 SOLPKG_CACHE, pkg->name);
+                 SPM_CACHE, pkg->name);
 
         /* Decompress */
         snprintf(cmd, sizeof(cmd),
@@ -864,7 +864,7 @@ int pkgdb_install(pkgdb_t *db, int avail_idx)
                      "/usr/tgcware/bin/gzip -dc %s > %s 2>/dev/null",
                      cache_path, uncompressed);
             if (system(cmd) != 0) {
-                fprintf(stderr, "solpkg: decompression failed\n");
+                fprintf(stderr, "spm: decompression failed\n");
                 return -1;
             }
         }
@@ -873,7 +873,7 @@ int pkgdb_install(pkgdb_t *db, int avail_idx)
         if (pkg->pkg_code[0] && pkgdb_sys_installed(pkg->pkg_code)) {
             char backup[512];
             snprintf(backup, sizeof(backup), "%s/%s-%s.bak",
-                     SOLPKG_ROLLBACK, pkg->name, pkg->version);
+                     SPM_ROLLBACK, pkg->name, pkg->version);
             /* pkgtrans the current package to a file for rollback */
             snprintf(cmd, sizeof(cmd),
                      "/usr/bin/pkgtrans -s /var/spool/pkg %s %s 2>/dev/null",
@@ -893,7 +893,7 @@ int pkgdb_install(pkgdb_t *db, int avail_idx)
         if (pkg->pkg_code[0] && pkgdb_sys_installed(pkg->pkg_code)) {
             char backup[512];
             snprintf(backup, sizeof(backup), "%s/%s-%s.bak",
-                     SOLPKG_ROLLBACK, pkg->name, pkg->version);
+                     SPM_ROLLBACK, pkg->name, pkg->version);
             snprintf(cmd, sizeof(cmd),
                      "/usr/bin/pkgtrans -s /var/spool/pkg %s %s 2>/dev/null",
                      backup, pkg->pkg_code);
@@ -908,7 +908,7 @@ int pkgdb_install(pkgdb_t *db, int avail_idx)
     }
 
     if (rc != 0) {
-        fprintf(stderr, "solpkg: pkgadd returned %d\n", rc);
+        fprintf(stderr, "spm: pkgadd returned %d\n", rc);
         return -1;
     }
 
@@ -933,7 +933,7 @@ int pkgdb_remove(pkgdb_t *db, int inst_idx)
     pkg = &db->installed[inst_idx];
 
     if (!pkg->pkg_code[0]) {
-        fprintf(stderr, "solpkg: no package code for %s\n", pkg->name);
+        fprintf(stderr, "spm: no package code for %s\n", pkg->name);
         return -1;
     }
 
@@ -945,7 +945,7 @@ int pkgdb_remove(pkgdb_t *db, int inst_idx)
     rc = system(cmd);
 
     if (rc != 0) {
-        fprintf(stderr, "solpkg: pkgrm returned %d\n", rc);
+        fprintf(stderr, "spm: pkgrm returned %d\n", rc);
         return -1;
     }
 
@@ -976,7 +976,7 @@ int pkgdb_rollback(pkgdb_t *db, int inst_idx)
 
     /* Look for backup file */
     snprintf(backup_pattern, sizeof(backup_pattern),
-             "%s/%s-*.bak", SOLPKG_ROLLBACK, pkg->name);
+             "%s/%s-*.bak", SPM_ROLLBACK, pkg->name);
 
     /* Use the stored pkg_file path for rollback */
     if (pkg->pkg_file[0] && stat(pkg->pkg_file, &st) == 0) {
@@ -993,7 +993,7 @@ int pkgdb_rollback(pkgdb_t *db, int inst_idx)
         if (strstr(pkg->pkg_file, ".gz")) {
             char uncompressed[512];
             snprintf(uncompressed, sizeof(uncompressed), "%s/rollback.tmp",
-                     SOLPKG_CACHE);
+                     SPM_CACHE);
             snprintf(cmd, sizeof(cmd),
                      "/usr/bin/gzip -dc %s > %s", pkg->pkg_file, uncompressed);
             system(cmd);
@@ -1015,7 +1015,7 @@ int pkgdb_rollback(pkgdb_t *db, int inst_idx)
 
     /* Try backup directory */
     snprintf(backup_file, sizeof(backup_file),
-             "%s/%s-%s.bak", SOLPKG_ROLLBACK, pkg->name, pkg->version);
+             "%s/%s-%s.bak", SPM_ROLLBACK, pkg->name, pkg->version);
     if (stat(backup_file, &st) == 0) {
         printf("Rolling back %s from backup...\n", pkg->name);
 
@@ -1034,7 +1034,7 @@ int pkgdb_rollback(pkgdb_t *db, int inst_idx)
         return 0;
     }
 
-    fprintf(stderr, "solpkg: no rollback data found for %s\n", pkg->name);
+    fprintf(stderr, "spm: no rollback data found for %s\n", pkg->name);
     fprintf(stderr, "  Checked: %s\n", pkg->pkg_file);
     fprintf(stderr, "  Checked: %s\n", backup_file);
     return -1;

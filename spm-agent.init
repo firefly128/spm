@@ -1,36 +1,36 @@
 #!/bin/sh
 #
-# solpkg-agent - Solaris init.d script for the solpkg update agent
+# spm-agent - Solaris init.d script for the spm update agent
 #
 # Install:
-#   cp solpkg-agent.init /etc/init.d/solpkg-agent
-#   chmod 755 /etc/init.d/solpkg-agent
-#   ln -s /etc/init.d/solpkg-agent /etc/rc2.d/S99solpkg-agent
-#   ln -s /etc/init.d/solpkg-agent /etc/rc0.d/K01solpkg-agent
+#   cp spm-agent.init /etc/init.d/spm-agent
+#   chmod 755 /etc/init.d/spm-agent
+#   ln -s /etc/init.d/spm-agent /etc/rc2.d/S99spm-agent
+#   ln -s /etc/init.d/spm-agent /etc/rc0.d/K01spm-agent
 #
 
-AGENT=/opt/solpkg/bin/solpkg-agent
-PIDFILE=/opt/solpkg/var/agent.pid
-LOGFILE=/opt/solpkg/var/agent.log
+AGENT=/opt/sst/bin/spm-agent
+PIDFILE=/opt/sst/var/agent.pid
+LOGFILE=/opt/sst/var/agent.log
 
 case "$1" in
 start)
     if [ ! -x "$AGENT" ]; then
-        echo "solpkg-agent: $AGENT not found"
+        echo "spm-agent: $AGENT not found"
         exit 1
     fi
 
     if [ -f "$PIDFILE" ]; then
         PID=`cat "$PIDFILE"`
         if kill -0 "$PID" 2>/dev/null; then
-            echo "solpkg-agent already running (pid $PID)"
+            echo "spm-agent already running (pid $PID)"
             exit 0
         fi
         # Stale PID file
         rm -f "$PIDFILE"
     fi
 
-    echo "Starting solpkg-agent..."
+    echo "Starting spm-agent..."
     $AGENT
     ;;
 
@@ -38,7 +38,7 @@ stop)
     if [ -f "$PIDFILE" ]; then
         PID=`cat "$PIDFILE"`
         if kill -0 "$PID" 2>/dev/null; then
-            echo "Stopping solpkg-agent (pid $PID)..."
+            echo "Stopping spm-agent (pid $PID)..."
             kill "$PID"
             # Wait up to 5 seconds
             i=0
@@ -50,13 +50,13 @@ stop)
                 i=`expr $i + 1`
             done
             if kill -0 "$PID" 2>/dev/null; then
-                echo "Force killing solpkg-agent..."
+                echo "Force killing spm-agent..."
                 kill -9 "$PID"
             fi
         fi
         rm -f "$PIDFILE"
     else
-        echo "solpkg-agent not running"
+        echo "spm-agent not running"
     fi
     ;;
 
@@ -70,21 +70,21 @@ status)
     if [ -f "$PIDFILE" ]; then
         PID=`cat "$PIDFILE"`
         if kill -0 "$PID" 2>/dev/null; then
-            echo "solpkg-agent is running (pid $PID)"
+            echo "spm-agent is running (pid $PID)"
 
             # Show status file if available
-            STATUS=/opt/solpkg/var/update.status
+            STATUS=/opt/sst/var/update.status
             if [ -f "$STATUS" ]; then
                 echo "Last check:"
                 cat "$STATUS"
             fi
             exit 0
         else
-            echo "solpkg-agent not running (stale PID file)"
+            echo "spm-agent not running (stale PID file)"
             exit 1
         fi
     else
-        echo "solpkg-agent not running"
+        echo "spm-agent not running"
         exit 1
     fi
     ;;
@@ -93,12 +93,12 @@ reload)
     if [ -f "$PIDFILE" ]; then
         PID=`cat "$PIDFILE"`
         if kill -0 "$PID" 2>/dev/null; then
-            echo "Reloading solpkg-agent config..."
+            echo "Reloading spm-agent config..."
             kill -HUP "$PID"
             exit 0
         fi
     fi
-    echo "solpkg-agent not running"
+    echo "spm-agent not running"
     exit 1
     ;;
 

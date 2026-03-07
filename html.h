@@ -5,8 +5,8 @@
  * and extracts package metadata (name, version, deps, md5, etc.)
  */
 
-#ifndef SOLPKG_HTML_H
-#define SOLPKG_HTML_H
+#ifndef SPM_HTML_H
+#define SPM_HTML_H
 
 /* Package entry parsed from the TGCware HTML index */
 typedef struct {
@@ -63,4 +63,4 @@ int tgc_find_latest(const tgc_index_t *idx, const char *name);
  */
 int tgc_find_by_code(const tgc_index_t *idx, const char *code);
 
-#endif /* SOLPKG_HTML_H */
+#endif /* SPM_HTML_H */

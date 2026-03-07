@@ -1,6 +1,6 @@
 {
   "generated": "2025-01-01T00:00:00Z",
-  "generator": "solpkg 0.1.0",
+  "generator": "spm 0.1.0",
   "repos": [
     {
       "name": "tgcware",
@@ -16,5 +16,5 @@
     }
   ],
   "package_count": 0,
-  "note": "Run 'solpkg update && solpkg export-deps' to populate"
+  "note": "Run 'spm update && spm export-deps' to populate"
 }

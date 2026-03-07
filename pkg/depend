@@ -1,6 +1,8 @@
-# solpkg requires TGCware OpenSSL for HTTPS and curl CA certs.
-# Also needs TGCware GCC runtime for building from source.
-P SBossl TGCware OpenSSL shared libraries
-P SBcacrt TGCware curl CA certificate bundle
-# Optional: TGCware GCC for building from source
-# P TGCgcc47 TGCware GCC 4.7 Compiler
+# spm requires Sunstorm OpenSSL for HTTPS.
+# Also needs Sunstorm libsolcompat and zlib.
+P SSTossl Sunstorm OpenSSL TLS/SSL library
+P SSTlsolc Sunstorm POSIX/C99 compatibility shim
+P SSTzlib Sunstorm compression library
+# CDE is needed for the GUI (standard Solaris install)
+P SUNWmfrun Motif RunTime Kit
+P SUNWxwplt X Window System platform software

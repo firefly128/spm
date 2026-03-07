@@ -1,24 +1,35 @@
 #!/bin/sh
-# preremove - Clean up before solpkg removal
+# preremove - Clean up before spm removal
 
-BASEDIR=${BASEDIR:-/opt/solpkg}
+BASEDIR=${BASEDIR:-/opt/sst}
 
-echo "Removing solpkg..."
+echo "Removing spm..."
 
 # Stop the agent if running
-if [ -x /etc/init.d/solpkg-agent ]; then
-    /etc/init.d/solpkg-agent stop 2>/dev/null
+if [ -x /etc/init.d/spm-agent ]; then
+    /etc/init.d/spm-agent stop 2>/dev/null
 fi
 
 # Remove rc links and init.d script
-rm -f /etc/rc2.d/S99solpkg-agent 2>/dev/null
-rm -f /etc/rc0.d/K01solpkg-agent 2>/dev/null
-rm -f /etc/init.d/solpkg-agent 2>/dev/null
+rm -f /etc/rc2.d/S99spm-agent 2>/dev/null
+rm -f /etc/rc0.d/K01spm-agent 2>/dev/null
+rm -f /etc/init.d/spm-agent 2>/dev/null
 
 # Remove symlinks
-rm -f /usr/local/bin/solpkg 2>/dev/null
-rm -f /usr/local/bin/solpkg-gui 2>/dev/null
-rm -f /usr/local/bin/solpkg-agent 2>/dev/null
+rm -f /usr/local/bin/spm 2>/dev/null
+rm -f /usr/local/bin/spm-gui 2>/dev/null
+rm -f /usr/local/bin/spm-agent 2>/dev/null
+
+# Remove CDE integration files
+rm -f /usr/dt/appconfig/types/C/spm.dt 2>/dev/null
+rm -f /usr/dt/appconfig/icons/C/Spm.l.pm 2>/dev/null
+rm -f /usr/dt/appconfig/icons/C/Spm.m.pm 2>/dev/null
+rm -f /usr/dt/appconfig/icons/C/Spm.l.bm 2>/dev/null
+
+# Reload CDE actions
+if [ -x /usr/dt/bin/dtaction ]; then
+    /usr/dt/bin/dtaction ReloadActions 2>/dev/null
+fi
 
 # Clean up agent runtime files
 rm -f ${BASEDIR}/var/agent.pid 2>/dev/null

@@ -1,12 +1,12 @@
-# solpkg Makefile for Solaris 7 SPARC
+# spm Makefile for Solaris 7 SPARC
 #
-# Package manager for TGCware and GitHub release packages.
+# Sunstorm Package Manager for Solaris 7 SPARC.
 # Uses OpenSSL (TGCware) loaded at runtime via dlopen for HTTPS.
 #
 # Builds three targets:
-#   solpkg       - CLI package manager
-#   solpkg-gui   - Motif/CDE graphical package manager
-#   solpkg-agent - Background update check daemon
+#   spm       - CLI package manager
+#   spm-gui   - Motif/CDE graphical package manager
+#   spm-agent - Background update check daemon
 #
 # Requires: TGCware OpenSSL (loaded at runtime via dlopen)
 #           Solaris socket/dl libs (-lsocket -lnsl -ldl)
@@ -38,18 +38,18 @@ SHARED_SRCS = http.c json.c html.c config.c pkgdb.c
 SHARED_OBJS = $(SHARED_SRCS:.c=.o)
 
 # CLI
-CLI_TARGET = solpkg
-CLI_OBJS = solpkg.o $(SHARED_OBJS)
+CLI_TARGET = spm
+CLI_OBJS = spm.o $(SHARED_OBJS)
 
 # GUI
-GUI_TARGET = solpkg-gui
-GUI_OBJS = solpkg-gui.o $(SHARED_OBJS)
+GUI_TARGET = spm-gui
+GUI_OBJS = spm-gui.o $(SHARED_OBJS)
 
 # Agent
-AGENT_TARGET = solpkg-agent
-AGENT_OBJS = solpkg-agent.o $(SHARED_OBJS)
+AGENT_TARGET = spm-agent
+AGENT_OBJS = spm-agent.o $(SHARED_OBJS)
 
-PREFIX = /opt/solpkg
+PREFIX = /opt/sst
 
 all: $(CLI_TARGET) $(GUI_TARGET) $(AGENT_TARGET)
 
@@ -73,12 +73,12 @@ $(AGENT_TARGET): $(AGENT_OBJS)
 	$(CC) $(CFLAGS) -c $<
 
 # GUI source needs Motif includes
-solpkg-gui.o: solpkg-gui.c config.h http.h html.h json.h pkgdb.h
-	$(CC) $(CFLAGS) $(MOTIF_CFLAGS) -c solpkg-gui.c
+spm-gui.o: spm-gui.c config.h http.h html.h json.h pkgdb.h
+	$(CC) $(CFLAGS) $(MOTIF_CFLAGS) -c spm-gui.c
 
 # Dependencies
-solpkg.o: solpkg.c config.h http.h html.h json.h pkgdb.h
-solpkg-agent.o: solpkg-agent.c config.h http.h json.h html.h pkgdb.h
+spm.o: spm.c config.h http.h html.h json.h pkgdb.h
+spm-agent.o: spm-agent.c config.h http.h json.h html.h pkgdb.h
 http.o: http.c http.h config.h
 json.o: json.c json.h
 html.o: html.c html.h
@@ -87,39 +87,39 @@ pkgdb.o: pkgdb.c pkgdb.h http.h json.h html.h config.h
 
 clean:
 	rm -f $(CLI_TARGET) $(GUI_TARGET) $(AGENT_TARGET) \
-	      solpkg.o solpkg-gui.o solpkg-agent.o $(SHARED_OBJS)
+	      spm.o spm-gui.o spm-agent.o $(SHARED_OBJS)
 
 install: all
-	@echo "Installing solpkg..."
+	@echo "Installing spm..."
 	mkdir -p $(PREFIX)/bin 2>/dev/null || true
 	mkdir -p $(PREFIX)/etc 2>/dev/null || true
 	mkdir -p $(PREFIX)/var/cache 2>/dev/null || true
 	mkdir -p $(PREFIX)/var/index 2>/dev/null || true
 	mkdir -p $(PREFIX)/var/rollback 2>/dev/null || true
-	cp $(CLI_TARGET) $(PREFIX)/bin/solpkg
-	cp $(GUI_TARGET) $(PREFIX)/bin/solpkg-gui
-	cp $(AGENT_TARGET) $(PREFIX)/bin/solpkg-agent
-	chmod 755 $(PREFIX)/bin/solpkg
-	chmod 755 $(PREFIX)/bin/solpkg-gui
-	chmod 755 $(PREFIX)/bin/solpkg-agent
+	cp $(CLI_TARGET) $(PREFIX)/bin/spm
+	cp $(GUI_TARGET) $(PREFIX)/bin/spm-gui
+	cp $(AGENT_TARGET) $(PREFIX)/bin/spm-agent
+	chmod 755 $(PREFIX)/bin/spm
+	chmod 755 $(PREFIX)/bin/spm-gui
+	chmod 755 $(PREFIX)/bin/spm-agent
 	@if [ ! -f $(PREFIX)/etc/repos.conf ]; then \
 		echo "Generating default config..."; \
-		$(PREFIX)/bin/solpkg --version >/dev/null 2>&1; \
+		$(PREFIX)/bin/spm --version >/dev/null 2>&1; \
 	fi
 	@echo ""
 	@echo "Installing init.d script..."
-	cp solpkg-agent.init /etc/init.d/solpkg-agent 2>/dev/null || true
-	chmod 755 /etc/init.d/solpkg-agent 2>/dev/null || true
+	cp spm-agent.init /etc/init.d/spm-agent 2>/dev/null || true
+	chmod 755 /etc/init.d/spm-agent 2>/dev/null || true
 	@echo ""
-	@echo "Done! Add /opt/solpkg/bin to your PATH:"
-	@echo "  PATH=/opt/solpkg/bin:\$$PATH; export PATH"
+	@echo "Done! Add /opt/sst/bin to your PATH:"
+	@echo "  PATH=/opt/sst/bin:\$$PATH; export PATH"
 	@echo ""
 	@echo "Start the update agent:"
-	@echo "  /etc/init.d/solpkg-agent start"
+	@echo "  /etc/init.d/spm-agent start"
 	@echo ""
 	@echo "Launch the GUI:"
-	@echo "  solpkg-gui"
+	@echo "  spm-gui"
 	@echo ""
-	@echo "Or use the CLI: solpkg update"
+	@echo "Or use the CLI: spm update"
 
 .PHONY: all cli gui agent clean install

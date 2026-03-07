@@ -1,0 +1,51 @@
+#
+# spm.dt - CDE Action and DataType definitions for
+#           Sunstorm Package Manager (spm)
+#
+# Install to: /usr/dt/appconfig/types/C/spm.dt
+# Or user:    ~/.dt/types/spm.dt
+#
+# After install, run: dtaction ReloadActions
+#
+
+# ---- Action Definition ----
+
+ACTION SpmGui
+{
+    LABEL           Sunstorm Package Manager
+    TYPE            COMMAND
+    EXEC_STRING     /opt/sst/bin/spm-gui
+    ICON            Spm
+    WINDOW_TYPE     NO_STDIO
+    DESCRIPTION     Manage software packages for Sunstorm and TGCware \
+                    on Solaris 7 SPARC.  Requires root password.
+}
+
+# ---- DataType for .pkg.Z files (compressed SVR4 packages) ----
+
+DATA_ATTRIBUTES SstPackage
+{
+    ACTIONS         Install
+    ICON            Spm
+    NAME_TEMPLATE   %s.pkg.Z
+    DESCRIPTION     Sunstorm SVR4 software package (compressed).
+    IS_TEXT         false
+}
+
+DATA_CRITERIA SstPackage_Criteria
+{
+    DATA_ATTRIBUTES_NAME    SstPackage
+    NAME_PATTERN            *.pkg.Z
+    MODE                    f
+}
+
+ACTION Install
+{
+    LABEL           Install Package
+    TYPE            COMMAND
+    ARG_TYPE        SstPackage
+    EXEC_STRING     /usr/dt/bin/dtterm -e /opt/sst/bin/spm install "%Arg_1%"
+    ICON            Spm
+    WINDOW_TYPE     NO_STDIO
+    DESCRIPTION     Install this SVR4 package using spm.
+}

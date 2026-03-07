@@ -5,11 +5,11 @@
  * numbers, booleans, null. Returns a tree of json_value structs.
  * No external dependencies.
  *
- * Originally from SPARCcord, reused for solpkg.
+ * Originally from SPARCcord, reused for spm.
  */
 
-#ifndef SOLPKG_JSON_H
-#define SOLPKG_JSON_H
+#ifndef SPM_JSON_H
+#define SPM_JSON_H
 
 typedef enum {
     JSON_NULL,
@@ -72,4 +72,4 @@ int           json_get_int(const json_value_t *obj, const char *key);
 int            json_array_len(const json_value_t *arr);
 json_value_t  *json_array_get(const json_value_t *arr, int index);
 
-#endif /* SOLPKG_JSON_H */
+#endif /* SPM_JSON_H */

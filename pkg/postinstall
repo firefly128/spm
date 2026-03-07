@@ -1,9 +1,9 @@
 #!/bin/sh
-# postinstall - Set up solpkg after package installation
+# postinstall - Set up spm after package installation
 
-BASEDIR=${BASEDIR:-/opt/solpkg}
+BASEDIR=${BASEDIR:-/opt/sst}
 
-echo "Setting up solpkg..."
+echo "Setting up spm..."
 
 # Create runtime directories
 mkdir -p ${BASEDIR}/var/cache 2>/dev/null
@@ -12,26 +12,26 @@ mkdir -p ${BASEDIR}/var/rollback 2>/dev/null
 
 # Create symlinks in /usr/local/bin if it exists
 if [ -d /usr/local/bin ]; then
-    ln -sf ${BASEDIR}/bin/solpkg /usr/local/bin/solpkg 2>/dev/null
-    ln -sf ${BASEDIR}/bin/solpkg-gui /usr/local/bin/solpkg-gui 2>/dev/null
-    ln -sf ${BASEDIR}/bin/solpkg-agent /usr/local/bin/solpkg-agent 2>/dev/null
+    ln -sf ${BASEDIR}/bin/spm /usr/local/bin/spm 2>/dev/null
+    ln -sf ${BASEDIR}/bin/spm-gui /usr/local/bin/spm-gui 2>/dev/null
+    ln -sf ${BASEDIR}/bin/spm-agent /usr/local/bin/spm-agent 2>/dev/null
 fi
 
 # Install init.d script and rc links for agent boot start
-if [ -f ${BASEDIR}/../etc/init.d/solpkg-agent ]; then
-    cp ${BASEDIR}/../etc/init.d/solpkg-agent /etc/init.d/solpkg-agent 2>/dev/null
+if [ -f ${BASEDIR}/../etc/init.d/spm-agent ]; then
+    cp ${BASEDIR}/../etc/init.d/spm-agent /etc/init.d/spm-agent 2>/dev/null
 fi
-if [ -x /etc/init.d/solpkg-agent ]; then
-    ln -sf /etc/init.d/solpkg-agent /etc/rc2.d/S99solpkg-agent 2>/dev/null
-    ln -sf /etc/init.d/solpkg-agent /etc/rc0.d/K01solpkg-agent 2>/dev/null
-    echo "Starting solpkg update agent..."
-    /etc/init.d/solpkg-agent start
+if [ -x /etc/init.d/spm-agent ]; then
+    ln -sf /etc/init.d/spm-agent /etc/rc2.d/S99spm-agent 2>/dev/null
+    ln -sf /etc/init.d/spm-agent /etc/rc0.d/K01spm-agent 2>/dev/null
+    echo "Starting spm update agent..."
+    /etc/init.d/spm-agent start
 fi
 
 # Generate default config if not present
 if [ ! -f ${BASEDIR}/etc/repos.conf ]; then
     cat > ${BASEDIR}/etc/repos.conf <<CONFEOF
-# solpkg repository configuration
+# spm repository configuration
 [ssl]
 ca_bundle = /usr/tgcware/etc/curl-ca-bundle.pem
 
@@ -56,13 +56,21 @@ CONFEOF
 fi
 
 echo ""
-echo "solpkg installed successfully."
+echo "spm installed successfully."
 echo ""
 echo "Add to your PATH:"
 echo "  PATH=${BASEDIR}/bin:\$PATH; export PATH"
 echo ""
-echo "CLI:   solpkg update"
-echo "GUI:   solpkg-gui"
-echo "Agent: /etc/init.d/solpkg-agent status"
+echo "CLI:   spm update"
+echo "GUI:   spm-gui  (or use Application Manager)"
+echo "Agent: /etc/init.d/spm-agent status"
+
+# Reload CDE actions so Sunstorm Package Manager appears in Application Manager
+if [ -x /usr/dt/bin/dtaction ]; then
+    /usr/dt/bin/dtaction ReloadActions 2>/dev/null
+    echo ""
+    echo "CDE desktop integration installed."
+    echo "Look for 'Sunstorm Package Manager' in the Application Manager."
+fi
 
 exit 0

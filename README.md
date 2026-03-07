@@ -1,4 +1,4 @@
-# solpkg - Solaris SPARC Package Manager
+# spm - Sunstorm Package Manager
 
 A package manager for Solaris 7 SPARC that aggregates packages from multiple
 sources: [TGCware](https://jupiterrise.com/tgcware/sunos5.7_sparc/stable/)
@@ -33,7 +33,7 @@ or bridge server required.
 
 ```sh
 # On the SPARCstation
-make          # builds all three: solpkg, solpkg-gui, solpkg-agent
+make          # builds all three: spm, spm-gui, spm-agent
 make install
 
 # Build individual targets
@@ -43,7 +43,7 @@ make agent    # Agent only
 
 # Or build an SVR4 package
 sh build-pkg.sh
-pkgadd -d solpkg-0.1.0-sparc.pkg
+pkgadd -d spm-0.1.0-sparc.pkg
 ```
 
 ## Usage
@@ -52,57 +52,57 @@ pkgadd -d solpkg-0.1.0-sparc.pkg
 
 ```sh
 # Add to PATH
-PATH=/opt/solpkg/bin:$PATH; export PATH
+PATH=/opt/sst/bin:$PATH; export PATH
 
 # Refresh package indices from all repos
-solpkg update
+spm update
 
 # Search for packages
-solpkg search curl
-solpkg search discord
+spm search curl
+spm search discord
 
 # Show package details
-solpkg info curl
+spm info curl
 
 # Show dependency tree
-solpkg deps curl
+spm deps curl
 
 # Install a package (resolves dependencies automatically)
-solpkg install curl
+spm install curl
 
 # Install multiple packages
-solpkg install bash vim emacs
+spm install bash vim emacs
 
 # Remove a package
-solpkg remove curl
+spm remove curl
 
 # Roll back to previous version
-solpkg rollback curl
+spm rollback curl
 
 # Upgrade all packages
-solpkg upgrade
+spm upgrade
 
 # Upgrade specific package
-solpkg upgrade curl
+spm upgrade curl
 
 # List all available packages
-solpkg list
+spm list
 
 # List installed packages
-solpkg list --installed
+spm list --installed
 
 # Show configured repositories
-solpkg repo list
+spm repo list
 
 # Clear download cache
-solpkg cache clean
+spm cache clean
 ```
 
 ### GUI (Motif/CDE)
 
 ```sh
 # Launch the graphical package manager
-DISPLAY=:0 solpkg-gui
+DISPLAY=:0 spm-gui
 ```
 
 The GUI provides a 2-pane layout: package list with search/filter on the left,
@@ -113,36 +113,36 @@ and Deps. The status bar shows agent update notifications.
 
 ```sh
 # Start the update agent (daemonizes by default)
-solpkg-agent
+spm-agent
 
 # Run in foreground (for debugging)
-solpkg-agent -f
+spm-agent -f
 
 # Set custom check interval (seconds)
-solpkg-agent -i 3600
+spm-agent -i 3600
 
 # Check agent status
-solpkg-agent -s
+spm-agent -s
 
 # Stop the agent
-solpkg-agent -k
+spm-agent -k
 
 # Init.d control
-/etc/init.d/solpkg-agent start
-/etc/init.d/solpkg-agent stop
-/etc/init.d/solpkg-agent status
-/etc/init.d/solpkg-agent reload    # SIGHUP: reload config + re-check
+/etc/init.d/spm-agent start
+/etc/init.d/spm-agent stop
+/etc/init.d/spm-agent status
+/etc/init.d/spm-agent reload    # SIGHUP: reload config + re-check
 ```
 
 The agent checks for updates at a configurable interval (default: 6 hours)
-and writes status to `/opt/solpkg/var/update.status`. The GUI reads this
+and writes status to `/opt/sst/var/update.status`. The GUI reads this
 file to show update notifications in the status bar.
 
-Send `SIGUSR1` to force an immediate check: `kill -USR1 $(cat /opt/solpkg/var/agent.pid)`
+Send `SIGUSR1` to force an immediate check: `kill -USR1 $(cat /opt/sst/var/agent.pid)`
 
 ## Configuration
 
-Configuration is stored in `/opt/solpkg/etc/repos.conf`:
+Configuration is stored in `/opt/sst/etc/repos.conf`:
 
 ```ini
 # SSL settings
@@ -183,11 +183,11 @@ configured repo. Indexes `.pkg` and `.gz` assets as installable packages.
 ## Directory Layout
 
 ```
-/opt/solpkg/
+/opt/sst/
 ├── bin/
-│   ├── solpkg              # CLI package manager
-│   ├── solpkg-gui          # Motif/CDE graphical UI
-│   └── solpkg-agent        # Background update daemon
+│   ├── spm              # CLI package manager
+│   ├── spm-gui          # Motif/CDE graphical UI
+│   └── spm-agent        # Background update daemon
 ├── etc/
 │   └── repos.conf          # Repository + agent configuration
 └── var/
@@ -200,9 +200,9 @@ configured repo. Indexes `.pkg` and `.gz` assets as installable packages.
     ├── agent.log           # Agent log file (runtime)
     └── update.status       # Agent update status (runtime)
 
-/etc/init.d/solpkg-agent    # Init script for boot start
-/etc/rc2.d/S99solpkg-agent  # Run-level 2 start link
-/etc/rc0.d/K01solpkg-agent  # Run-level 0 stop link
+/etc/init.d/spm-agent    # Init script for boot start
+/etc/rc2.d/S99spm-agent  # Run-level 2 start link
+/etc/rc0.d/K01spm-agent  # Run-level 0 stop link
 ```
 
 ## Architecture
@@ -213,14 +213,14 @@ configured repo. Indexes `.pkg` and `.gz` assets as installable packages.
 │  SPARCstation│ ──────────────── │ jupiterrise.com│
 │             │                  │ api.github.com │
 │  ┌─────────┐│                  │ github.com     │
-│  │ solpkg  ││                  └────────────────┘
+│  │ spm  ││                  └────────────────┘
 │  │ (CLI)   ││
 │  ├─────────┤│
-│  │ solpkg  ││  Motif/X11
+│  │ spm  ││  Motif/X11
 │  │  -gui   │├──────────── CDE Desktop
 │  ├─────────┤│
-│  │ solpkg  ││  sleep loop
-│  │ -agent  │├──────────── /opt/solpkg/var/update.status
+│  │ spm  ││  sleep loop
+│  │ -agent  │├──────────── /opt/sst/var/update.status
 │  └─────────┘│
 │      │      │
 │  pkgadd/rm  │
@@ -232,7 +232,7 @@ configured repo. Indexes `.pkg` and `.gz` assets as installable packages.
 └─────────────┘
 ```
 
-solpkg talks HTTPS directly using the TGCware OpenSSL 1.0.2 library.
+spm talks HTTPS directly using the TGCware OpenSSL 1.0.2 library.
 No proxy or bridge server is needed.  CA certificates come from the
 TGCware curl package's CA bundle.
 
@@ -241,7 +241,7 @@ TGCware curl package's CA bundle.
 TGCware packages embed their dependencies in the HTML directory listing
 description field as comma-separated package codes (e.g., `TGCgtext,TGClgcc1,TGCzlib`).
 
-When you run `solpkg install curl`, solpkg:
+When you run `spm install curl`, spm:
 1. Looks up `curl` in the available package index
 2. Reads its dependency list: `TGCgtext,TGClgcc1,TGClicnv,...`
 3. Checks each dependency against `pkginfo` (system SVR4 database)
@@ -251,13 +251,13 @@ When you run `solpkg install curl`, solpkg:
 
 ## Source Correlation
 
-For TGCware packages, solpkg maps each binary package to its build recipe in
+For TGCware packages, spm maps each binary package to its build recipe in
 the [tgcwarev2-for-solaris](https://github.com/AstroVPK/tgcwarev2-for-solaris)
-repository. Use `solpkg info <pkg>` to see the source URL.
+repository. Use `spm info <pkg>` to see the source URL.
 
 ## SVR4 Package
 
-solpkg itself is distributed as an SVR4 package (`JWsolpkg`). Build it with
+spm itself is distributed as an SVR4 package (`SSTspm`). Build it with
 `sh build-pkg.sh` on any Solaris 7 SPARC system with TGCware GCC installed.
 
 ## License

@@ -5,7 +5,7 @@
  * Handles: objects, arrays, strings (with escape sequences),
  * numbers (int and float), booleans, null.
  *
- * Originally from SPARCcord, reused for solpkg.
+ * Originally from SPARCcord, reused for spm.
  */
 
 #include "json.h"

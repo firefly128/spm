@@ -1,31 +1,31 @@
-.\" solpkg.1m - Solaris SPARC Package Manager
+.\" spm.1m - Sunstorm Package Manager
 .\" Copyright (c) 2025 Julian Wolfe
-.TH SOLPKG 1M "June 2025" "solpkg 0.1.0" "System Administration Commands"
+.TH SPM 1M "June 2025" "spm 0.1.0" "System Administration Commands"
 .SH NAME
-solpkg \- Solaris SPARC package manager for TGCware and GitHub repositories
+spm \- Sunstorm Package Manager for TGCware and GitHub repositories
 .SH SYNOPSIS
-.B solpkg
+.B spm
 .IR command
 .RI [ arguments ]
 .br
-.B solpkg-gui
+.B spm-gui
 .br
-.B solpkg-agent
+.B spm-agent
 .SH DESCRIPTION
-.B solpkg
+.B spm
 is a package manager for Solaris 7 SPARC systems that indexes and installs
 packages from TGCware and GitHub release repositories. It handles package
 downloads over HTTPS (via native OpenSSL), automatic dependency resolution,
 and SVR4 package installation via
 .BR pkgadd (1M).
 .PP
-.B solpkg-gui
+.B spm-gui
 provides a Motif/CDE graphical interface with a two-pane layout showing
 the package list on the left and package details on the right. It supports
 searching, filtering by installed/available status, and one-click
 install, remove, and upgrade operations.
 .PP
-.B solpkg-agent
+.B spm-agent
 is a background daemon that periodically checks repositories for
 available updates and notifies the user via CDE.
 .SH COMMANDS
@@ -54,7 +54,7 @@ List all available packages with version, architecture, size,
 repository, and description.
 .TP
 .B list --installed
-List only packages installed through solpkg, with version, SVR4 code,
+List only packages installed through spm, with version, SVR4 code,
 install date, and repository.
 .TP
 .BI info " pkg"
@@ -88,23 +88,23 @@ Display usage information and exit.
 Display version and exit.
 .SH FILES
 .TP
-.I /opt/solpkg/etc/repos.conf
+.I /opt/sst/etc/repos.conf
 Repository configuration file. Defines TGCware and GitHub repository
 sources, SSL settings, and agent parameters.
 .TP
-.I /opt/solpkg/var/index/available.idx
+.I /opt/sst/var/index/available.idx
 Cached package index (pipe-separated flat file).
 .TP
-.I /opt/solpkg/var/installed.db
-Database of packages installed through solpkg.
+.I /opt/sst/var/installed.db
+Database of packages installed through spm.
 .TP
-.I /opt/solpkg/var/cache/
+.I /opt/sst/var/cache/
 Downloaded package file cache.
 .TP
-.I /opt/solpkg/var/rollback/
+.I /opt/sst/var/rollback/
 Backup files for package rollback.
 .TP
-.I /opt/solpkg/var/admin
+.I /opt/sst/var/admin
 Non-interactive admin file for pkgadd(1M).
 .TP
 .I /usr/tgcware/etc/curl-ca-bundle.pem
@@ -113,14 +113,14 @@ CA certificate bundle used for HTTPS connections.
 .TP
 .B DISPLAY
 Required for
-.B solpkg-gui
+.B spm-gui
 to connect to the X11 display. Typically set to \fB:0\fP on CDE.
 .SH EXAMPLES
 Update the package index:
 .PP
 .RS
 .nf
-$ solpkg update
+$ spm update
 .fi
 .RE
 .PP
@@ -128,7 +128,7 @@ Search for packages:
 .PP
 .RS
 .nf
-$ solpkg search python
+$ spm search python
 .fi
 .RE
 .PP
@@ -136,7 +136,7 @@ Install a package and its dependencies:
 .PP
 .RS
 .nf
-# solpkg install python27
+# spm install python27
 .fi
 .RE
 .PP
@@ -144,7 +144,7 @@ List installed packages:
 .PP
 .RS
 .nf
-$ solpkg list --installed
+$ spm list --installed
 .fi
 .RE
 .PP
@@ -152,18 +152,18 @@ Launch the GUI:
 .PP
 .RS
 .nf
-$ DISPLAY=:0 solpkg-gui &
+$ DISPLAY=:0 spm-gui &
 .fi
 .RE
 .SH NOTES
-.B solpkg
+.B spm
 loads OpenSSL at runtime via
 .BR dlopen (3C)
 to avoid linking against the large OpenSSL shared libraries at build time,
 which is important for the limited resources of vintage SPARC hardware.
 .PP
 Package installation requires root privileges. On systems where
-.B solpkg
+.B spm
 is installed as a regular user, use
 .BR su (1M)
 or

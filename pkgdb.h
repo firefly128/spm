@@ -6,8 +6,8 @@
  * resolution for Solaris SVR4 packages.
  */
 
-#ifndef SOLPKG_PKGDB_H
-#define SOLPKG_PKGDB_H
+#ifndef SPM_PKGDB_H
+#define SPM_PKGDB_H
 
 #include "config.h"
 #include "html.h"
@@ -88,7 +88,7 @@ void pkgdb_add_tgcware(pkgdb_t *db, const tgc_index_t *idx,
 /*
  * Add available packages from GitHub releases JSON.
  * json_body: raw JSON string from GitHub API.
- * repo_name: "firefly128" (the solpkg repo name).
+ * repo_name: "firefly128" (the spm repo name).
  * gh_repo: "pizzafool" (the GitHub repository name).
  * owner: "firefly128" (the GitHub username).
  */
@@ -214,4 +214,4 @@ int pkgdb_find_all_versions(const pkgdb_t *db, const char *name,
  */
 int pkgdb_any_version_installed(const pkgdb_t *db, const char *name);
 
-#endif /* SOLPKG_PKGDB_H */
+#endif /* SPM_PKGDB_H */

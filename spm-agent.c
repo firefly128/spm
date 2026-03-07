@@ -1,12 +1,12 @@
 /*
- * solpkg-agent.c - Background update agent for solpkg
+ * spm-agent.c - Background update agent for spm
  *
  * Runs as a daemon, periodically checks repositories for package
- * updates. Writes status to /opt/solpkg/var/update.status so the
+ * updates. Writes status to /opt/sst/var/update.status so the
  * GUI and CLI can report available updates.
  *
- * Started via /etc/init.d/solpkg-agent or manually:
- *   solpkg-agent [-f] [-i interval]
+ * Started via /etc/init.d/spm-agent or manually:
+ *   spm-agent [-f] [-i interval]
  *
  *   -f            Run in foreground (don't daemonize)
  *   -i <seconds>  Check interval (default: from config, or 6 hours)
@@ -40,7 +40,7 @@
  * GLOBALS
  * ================================================================ */
 
-static solpkg_config_t g_config;
+static spm_config_t g_config;
 static volatile int g_running = 1;
 static volatile int g_reload = 0;
 static volatile int g_force_check = 0;
@@ -83,10 +83,10 @@ static int write_pid_file(void)
 {
     FILE *f;
 
-    f = fopen(SOLPKG_AGENT_PID, "w");
+    f = fopen(SPM_AGENT_PID, "w");
     if (!f) {
         agent_log("cannot write PID file %s: %s",
-                  SOLPKG_AGENT_PID, strerror(errno));
+                  SPM_AGENT_PID, strerror(errno));
         return -1;
     }
     fprintf(f, "%ld\n", (long)getpid());
@@ -96,7 +96,7 @@ static int write_pid_file(void)
 
 static void remove_pid_file(void)
 {
-    unlink(SOLPKG_AGENT_PID);
+    unlink(SPM_AGENT_PID);
 }
 
 static int check_already_running(void)
@@ -105,7 +105,7 @@ static int check_already_running(void)
     char line[64];
     pid_t pid;
 
-    f = fopen(SOLPKG_AGENT_PID, "r");
+    f = fopen(SPM_AGENT_PID, "r");
     if (!f)
         return 0;  /* No PID file, not running */
 
@@ -118,7 +118,7 @@ static int check_already_running(void)
             return 1;
         }
         /* Stale PID file */
-        unlink(SOLPKG_AGENT_PID);
+        unlink(SPM_AGENT_PID);
         return 0;
     }
 
@@ -159,7 +159,7 @@ static int daemonize(void)
 
     pid = fork();
     if (pid < 0) {
-        perror("solpkg-agent: fork");
+        perror("spm-agent: fork");
         return -1;
     }
     if (pid > 0) {
@@ -173,7 +173,7 @@ static int daemonize(void)
     /* Second fork to prevent terminal reacquisition */
     pid = fork();
     if (pid < 0) {
-        perror("solpkg-agent: fork2");
+        perror("spm-agent: fork2");
         return -1;
     }
     if (pid > 0) {
@@ -220,12 +220,12 @@ static int check_for_updates(void)
     pkgdb_load_installed(db);
     pkgdb_load_spool(db, "/var/spool/pkg");
 
-    /* Fetch fresh index data by calling solpkg update in a subprocess.
+    /* Fetch fresh index data by calling spm update in a subprocess.
      * This is simpler than duplicating the full update logic and ensures
      * we use the same code paths as the CLI. */
     {
         int ret;
-        ret = system("solpkg update >/dev/null 2>&1");
+        ret = system("spm update >/dev/null 2>&1");
         if (ret != 0) {
             agent_log("update command failed (exit %d)", ret);
             pkgdb_free(db);
@@ -257,7 +257,7 @@ static int check_for_updates(void)
     }
 
     /* Write status file */
-    sf = fopen(SOLPKG_UPDATE_STATUS, "w");
+    sf = fopen(SPM_UPDATE_STATUS, "w");
     if (sf) {
         time_t now = time(NULL);
         fprintf(sf, "updates=%d\n", updates_available);
@@ -289,7 +289,7 @@ static void run_agent(void)
     if (interval < 60)
         interval = 60;
 
-    agent_log("solpkg-agent started (pid %ld, interval %d sec)",
+    agent_log("spm-agent started (pid %ld, interval %d sec)",
               (long)getpid(), interval);
 
     /* Initial check on startup */
@@ -329,7 +329,7 @@ static void run_agent(void)
         }
     }
 
-    agent_log("solpkg-agent shutting down");
+    agent_log("spm-agent shutting down");
 }
 
 /* ================================================================
@@ -339,9 +339,9 @@ static void run_agent(void)
 static void usage(void)
 {
     fprintf(stderr,
-        "solpkg-agent %s - Background update agent\n"
+        "spm-agent %s - Background update agent\n"
         "\n"
-        "Usage: solpkg-agent [-f] [-i interval]\n"
+        "Usage: spm-agent [-f] [-i interval]\n"
         "\n"
         "Options:\n"
         "  -f             Run in foreground (don't daemonize)\n"
@@ -358,9 +358,9 @@ static void usage(void)
         "PID: %s\n"
         "Log: %s\n"
         "Status: %s\n",
-        SOLPKG_VERSION,
-        SOLPKG_CONF, SOLPKG_AGENT_PID,
-        SOLPKG_AGENT_LOG, SOLPKG_UPDATE_STATUS);
+        SPM_VERSION,
+        SPM_CONF, SPM_AGENT_PID,
+        SPM_AGENT_LOG, SPM_UPDATE_STATUS);
 }
 
 /* Kill running agent */
@@ -370,35 +370,35 @@ static int kill_agent(void)
     char line[64];
     pid_t pid;
 
-    f = fopen(SOLPKG_AGENT_PID, "r");
+    f = fopen(SPM_AGENT_PID, "r");
     if (!f) {
-        fprintf(stderr, "solpkg-agent: no PID file; agent not running?\n");
+        fprintf(stderr, "spm-agent: no PID file; agent not running?\n");
         return 1;
     }
 
     if (!fgets(line, sizeof(line), f)) {
         fclose(f);
-        fprintf(stderr, "solpkg-agent: empty PID file\n");
+        fprintf(stderr, "spm-agent: empty PID file\n");
         return 1;
     }
     fclose(f);
 
     pid = (pid_t)atoi(line);
     if (pid <= 0) {
-        fprintf(stderr, "solpkg-agent: invalid PID in file\n");
+        fprintf(stderr, "spm-agent: invalid PID in file\n");
         return 1;
     }
 
     if (kill(pid, 0) != 0) {
-        fprintf(stderr, "solpkg-agent: process %ld not running (stale PID)\n",
+        fprintf(stderr, "spm-agent: process %ld not running (stale PID)\n",
                 (long)pid);
-        unlink(SOLPKG_AGENT_PID);
+        unlink(SPM_AGENT_PID);
         return 1;
     }
 
     printf("Sending SIGTERM to agent (pid %ld)...\n", (long)pid);
     if (kill(pid, SIGTERM) != 0) {
-        perror("solpkg-agent: kill");
+        perror("spm-agent: kill");
         return 1;
     }
 
@@ -409,7 +409,7 @@ static int kill_agent(void)
             usleep(500000);
             if (kill(pid, 0) != 0) {
                 printf("Agent stopped.\n");
-                unlink(SOLPKG_AGENT_PID);
+                unlink(SPM_AGENT_PID);
                 return 0;
             }
         }
@@ -417,7 +417,7 @@ static int kill_agent(void)
 
     printf("Agent did not stop; sending SIGKILL...\n");
     kill(pid, SIGKILL);
-    unlink(SOLPKG_AGENT_PID);
+    unlink(SPM_AGENT_PID);
     return 0;
 }
 
@@ -428,7 +428,7 @@ static int show_status(void)
     char line[256];
     struct stat sb;
 
-    f = fopen(SOLPKG_AGENT_PID, "r");
+    f = fopen(SPM_AGENT_PID, "r");
     if (!f) {
         printf("Agent: not running\n");
     } else {
@@ -445,12 +445,12 @@ static int show_status(void)
         }
     }
 
-    if (stat(SOLPKG_UPDATE_STATUS, &sb) != 0) {
+    if (stat(SPM_UPDATE_STATUS, &sb) != 0) {
         printf("Status: no data (never checked)\n");
         return 0;
     }
 
-    f = fopen(SOLPKG_UPDATE_STATUS, "r");
+    f = fopen(SPM_UPDATE_STATUS, "r");
     if (!f) {
         printf("Status: cannot read\n");
         return 0;
@@ -505,7 +505,7 @@ int main(int argc, char *argv[])
             usage();
             return 0;
         } else {
-            fprintf(stderr, "solpkg-agent: unknown option: %s\n", argv[i]);
+            fprintf(stderr, "spm-agent: unknown option: %s\n", argv[i]);
             usage();
             return 1;
         }
@@ -522,8 +522,8 @@ int main(int argc, char *argv[])
     /* Check if already running */
     if (check_already_running()) {
         fprintf(stderr,
-            "solpkg-agent: already running (see %s)\n",
-            SOLPKG_AGENT_PID);
+            "spm-agent: already running (see %s)\n",
+            SPM_AGENT_PID);
         return 1;
     }
 
@@ -531,7 +531,7 @@ int main(int argc, char *argv[])
     if (g_config.ca_bundle[0])
         http_set_ca_bundle(g_config.ca_bundle);
     if (http_init() != 0) {
-        fprintf(stderr, "solpkg-agent: warning: SSL init failed\n");
+        fprintf(stderr, "spm-agent: warning: SSL init failed\n");
     }
 
     /* Install signal handlers */
@@ -544,13 +544,13 @@ int main(int argc, char *argv[])
     /* Daemonize unless foreground mode */
     if (!g_foreground) {
         if (daemonize() != 0) {
-            fprintf(stderr, "solpkg-agent: daemonize failed\n");
+            fprintf(stderr, "spm-agent: daemonize failed\n");
             return 1;
         }
     }
 
     /* Open log file */
-    g_logfp = fopen(SOLPKG_AGENT_LOG, "a");
+    g_logfp = fopen(SPM_AGENT_LOG, "a");
     if (!g_logfp && !g_foreground) {
         /* Can't log anywhere; just continue silently */
         g_logfp = NULL;
@@ -567,7 +567,7 @@ int main(int argc, char *argv[])
 
     /* Cleanup */
     remove_pid_file();
-    unlink(SOLPKG_UPDATE_STATUS);
+    unlink(SPM_UPDATE_STATUS);
     http_shutdown();
 
     if (g_logfp) {

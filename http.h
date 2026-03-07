@@ -7,8 +7,8 @@
  * On Solaris, link with: -lssl -lcrypto -lsocket -lnsl
  */
 
-#ifndef SOLPKG_HTTP_H
-#define SOLPKG_HTTP_H
+#ifndef SPM_HTTP_H
+#define SPM_HTTP_H
 
 #include <stddef.h>
 
@@ -64,4 +64,4 @@ int http_download(const char *url, const char *dest_path,
  */
 void http_response_free(http_response_t *resp);
 
-#endif /* SOLPKG_HTTP_H */
+#endif /* SPM_HTTP_H */

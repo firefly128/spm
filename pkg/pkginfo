@@ -1,9 +1,9 @@
-PKG=JWsolpkg
-NAME=solpkg - Solaris SPARC Package Manager
+PKG=SSTspm
+NAME=spm - Sunstorm Package Manager
 ARCH=sparc
 VERSION=0.1.0
 CATEGORY=system
 VENDOR=Julian Wolfe
 EMAIL=
-BASEDIR=/opt/solpkg
+BASEDIR=/opt/sst
 CLASSES=none

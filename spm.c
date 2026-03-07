@@ -1,5 +1,5 @@
 /*
- * solpkg.c - Solaris SPARC Package Manager
+ * spm.c - Sunstorm Package Manager
  *
  * Main CLI entry point.  Uses native OpenSSL (TGCware) for
  * HTTPS access to TGCware repositories and GitHub releases.
@@ -34,7 +34,7 @@
 #include <unistd.h>
 #include <dirent.h>
 
-static solpkg_config_t g_config;
+static spm_config_t g_config;
 static pkgdb_t *g_db;
 
 /* ================================================================
@@ -44,9 +44,9 @@ static pkgdb_t *g_db;
 static void usage(void)
 {
     printf(
-        "solpkg %s - Solaris SPARC Package Manager\n"
+        "spm %s - Sunstorm Package Manager\n"
         "\n"
-        "Usage: solpkg <command> [arguments]\n"
+        "Usage: spm <command> [arguments]\n"
         "\n"
         "Commands:\n"
         "  update              Refresh package index from all repos\n"
@@ -65,7 +65,7 @@ static void usage(void)
         "Configuration: %s/repos.conf\n"
         "SSL: native OpenSSL (TGCware)\n"
         "\n",
-        SOLPKG_VERSION, SOLPKG_ETC);
+        SPM_VERSION, SPM_ETC);
 }
 
 /* ================================================================
@@ -82,7 +82,7 @@ static int init(void)
     if (g_config.ca_bundle[0])
         http_set_ca_bundle(g_config.ca_bundle);
     if (http_init() != 0) {
-        fprintf(stderr, "solpkg: warning: SSL initialization failed.\n");
+        fprintf(stderr, "spm: warning: SSL initialization failed.\n");
         fprintf(stderr, "  HTTPS connections may not work.\n");
     }
 
@@ -195,7 +195,7 @@ static int cmd_search(const char *term)
     int count, i, shown;
 
     if (g_db->avail_count == 0) {
-        fprintf(stderr, "No packages in index. Run 'solpkg update' first.\n");
+        fprintf(stderr, "No packages in index. Run 'spm update' first.\n");
         return 1;
     }
 
@@ -241,7 +241,7 @@ static int cmd_list(int installed_only)
 
     if (installed_only) {
         if (g_db->inst_count == 0) {
-            printf("No packages installed via solpkg.\n");
+            printf("No packages installed via spm.\n");
             return 0;
         }
         printf("%-24s %-12s %-10s %-18s %s\n",
@@ -257,7 +257,7 @@ static int cmd_list(int installed_only)
         printf("\n%d package(s) installed.\n", g_db->inst_count);
     } else {
         if (g_db->avail_count == 0) {
-            fprintf(stderr, "No packages in index. Run 'solpkg update' first.\n");
+            fprintf(stderr, "No packages in index. Run 'spm update' first.\n");
             return 1;
         }
         printf("%-24s %-12s %-8s %-6s %-10s %s\n",
@@ -408,7 +408,7 @@ static int cmd_install(int argc, char **argv)
     int i;
 
     if (g_db->avail_count == 0) {
-        fprintf(stderr, "No packages in index. Run 'solpkg update' first.\n");
+        fprintf(stderr, "No packages in index. Run 'spm update' first.\n");
         return 1;
     }
 
@@ -523,7 +523,7 @@ static int cmd_upgrade(int argc, char **argv)
     int upgraded = 0;
 
     if (g_db->avail_count == 0) {
-        fprintf(stderr, "No packages in index. Run 'solpkg update' first.\n");
+        fprintf(stderr, "No packages in index. Run 'spm update' first.\n");
         return 1;
     }
 
@@ -613,7 +613,7 @@ static int cmd_cache_clean(void)
     int count = 0;
     long freed = 0;
 
-    d = opendir(SOLPKG_CACHE);
+    d = opendir(SPM_CACHE);
     if (!d) {
         printf("Cache directory is empty.\n");
         return 0;
@@ -625,7 +625,7 @@ static int cmd_cache_clean(void)
 
         if (ent->d_name[0] == '.') continue;
 
-        snprintf(path, sizeof(path), "%s/%s", SOLPKG_CACHE, ent->d_name);
+        snprintf(path, sizeof(path), "%s/%s", SPM_CACHE, ent->d_name);
         if (stat(path, &st) == 0) {
             freed += st.st_size;
             unlink(path);
@@ -658,7 +658,7 @@ int main(int argc, char **argv)
 
     /* Allow --version and --help without full init */
     if (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-V") == 0) {
-        printf("solpkg %s\n", SOLPKG_VERSION);
+        printf("spm %s\n", SPM_VERSION);
         return 0;
     }
     if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
@@ -675,7 +675,7 @@ int main(int argc, char **argv)
     }
     else if (strcmp(argv[1], "search") == 0) {
         if (argc < 3) {
-            fprintf(stderr, "Usage: solpkg search <term>\n");
+            fprintf(stderr, "Usage: spm search <term>\n");
             return 1;
         }
         return cmd_search(argv[2]);
@@ -688,35 +688,35 @@ int main(int argc, char **argv)
     }
     else if (strcmp(argv[1], "info") == 0) {
         if (argc < 3) {
-            fprintf(stderr, "Usage: solpkg info <package>\n");
+            fprintf(stderr, "Usage: spm info <package>\n");
             return 1;
         }
         return cmd_info(argv[2]);
     }
     else if (strcmp(argv[1], "deps") == 0) {
         if (argc < 3) {
-            fprintf(stderr, "Usage: solpkg deps <package>\n");
+            fprintf(stderr, "Usage: spm deps <package>\n");
             return 1;
         }
         return cmd_deps(argv[2]);
     }
     else if (strcmp(argv[1], "install") == 0) {
         if (argc < 3) {
-            fprintf(stderr, "Usage: solpkg install <package>...\n");
+            fprintf(stderr, "Usage: spm install <package>...\n");
             return 1;
         }
         return cmd_install(argc - 2, argv + 2);
     }
     else if (strcmp(argv[1], "remove") == 0) {
         if (argc < 3) {
-            fprintf(stderr, "Usage: solpkg remove <package>...\n");
+            fprintf(stderr, "Usage: spm remove <package>...\n");
             return 1;
         }
         return cmd_remove(argc - 2, argv + 2);
     }
     else if (strcmp(argv[1], "rollback") == 0) {
         if (argc < 3) {
-            fprintf(stderr, "Usage: solpkg rollback <package>\n");
+            fprintf(stderr, "Usage: spm rollback <package>\n");
             return 1;
         }
         return cmd_rollback(argv[2]);
@@ -728,14 +728,14 @@ int main(int argc, char **argv)
         if (argc >= 3 && strcmp(argv[2], "list") == 0) {
             return cmd_repo_list();
         }
-        fprintf(stderr, "Usage: solpkg repo list\n");
+        fprintf(stderr, "Usage: spm repo list\n");
         return 1;
     }
     else if (strcmp(argv[1], "cache") == 0) {
         if (argc >= 3 && strcmp(argv[2], "clean") == 0) {
             return cmd_cache_clean();
         }
-        fprintf(stderr, "Usage: solpkg cache clean\n");
+        fprintf(stderr, "Usage: spm cache clean\n");
         return 1;
     }
     else {
