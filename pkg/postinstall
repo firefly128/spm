@@ -72,28 +72,33 @@ echo "CLI:   spm update"
 echo "GUI:   spm-gui  (or use Application Manager)"
 echo "Agent: /etc/init.d/spm-agent status"
 
-# Reload CDE actions so Sunstorm Package Manager appears in Application Manager
+# Set up CDE desktop integration
 if [ -x /usr/dt/bin/dtaction ]; then
-    # Ensure CDE files are installed (needed for bootstrap which doesn't stage them)
     DTYPES=/usr/dt/appconfig/types/C
     DICONS=/usr/dt/appconfig/icons/C
-    mkdir -p "${DTYPES}" "${DICONS}" 2>/dev/null
+    ETCTYPES=/etc/dt/appconfig/types/C
+    mkdir -p "${DTYPES}" "${DICONS}" "${ETCTYPES}" 2>/dev/null
 
-    # Install .dt action file if not already present
-    if [ ! -f "${DTYPES}/spm.dt" -a -f ${BASEDIR}/share/dt/spm.dt ]; then
+    # Install .dt action file
+    if [ -f ${BASEDIR}/share/dt/spm.dt ]; then
         cp ${BASEDIR}/share/dt/spm.dt "${DTYPES}/spm.dt"
     fi
-    # Install icons if not already present
+    # Install front panel entry (adds to Applications drawer on dock)
+    if [ -f ${BASEDIR}/share/dt/spm.fp ]; then
+        cp ${BASEDIR}/share/dt/spm.fp "${ETCTYPES}/spm.fp"
+    fi
+    # Install icons
     for icon in Spm.l.pm Spm.m.pm Spm.l.bm; do
-        if [ ! -f "${DICONS}/${icon}" -a -f ${BASEDIR}/share/dt/${icon} ]; then
+        if [ -f ${BASEDIR}/share/dt/${icon} ]; then
             cp ${BASEDIR}/share/dt/${icon} "${DICONS}/${icon}"
         fi
     done
 
-    # Register in System_Admin drawer — CDE appmanager uses an executable
+    # Register in System_Admin — CDE appmanager uses an executable
     # file whose name matches the ACTION name in the .dt file
     APPDIR=/usr/dt/appconfig/appmanager/C/System_Admin
     mkdir -p "${APPDIR}" 2>/dev/null
+    rm -f "${APPDIR}/SpmGui" 2>/dev/null
     cat > "${APPDIR}/SpmGui" <<'ACTEOF'
 #!/bin/sh
 exec /usr/dt/bin/dtaction SpmGui
@@ -103,7 +108,7 @@ ACTEOF
     /usr/dt/bin/dtaction ReloadActions 2>/dev/null
     echo ""
     echo "CDE desktop integration installed."
-    echo "Look for 'Sunstorm Package Manager' in Application Manager > System_Admin."
+    echo "Look for 'Package Manager' in the Applications drawer on the front panel."
 fi
 
 exit 0

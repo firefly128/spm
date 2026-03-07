@@ -2152,11 +2152,36 @@ static int try_su_reexec(const char *password, const char *display,
     if (master < 0) return -1;
 
     /* Build the command su will run.
-     * We pass DISPLAY through, and re-exec the same binary. */
-    snprintf(cmd, sizeof(cmd),
-             "DISPLAY=%s; export DISPLAY; "
-             "exec /opt/sst/bin/spm-gui",
-             display ? display : ":0");
+     * We pass DISPLAY through, and transfer the X auth cookie so root
+     * can connect to the display, then re-exec the same binary.
+     * On Solaris 7 CDE, XAUTHORITY may not be set — default is
+     * $HOME/.Xauthority.  We point root's XAUTHORITY at the original
+     * user's file so the cookie is available without xauth(1). */
+    {
+        const char *xauth_file = getenv("XAUTHORITY");
+        char xauth_buf[256];
+        if (!xauth_file || !xauth_file[0]) {
+            const char *home = getenv("HOME");
+            if (home) {
+                snprintf(xauth_buf, sizeof(xauth_buf),
+                         "%s/.Xauthority", home);
+                xauth_file = xauth_buf;
+            }
+        }
+        if (xauth_file && xauth_file[0]) {
+            snprintf(cmd, sizeof(cmd),
+                     "DISPLAY=%s; export DISPLAY; "
+                     "XAUTHORITY=%s; export XAUTHORITY; "
+                     "exec /opt/sst/bin/spm-gui",
+                     display ? display : ":0",
+                     xauth_file);
+        } else {
+            snprintf(cmd, sizeof(cmd),
+                     "DISPLAY=%s; export DISPLAY; "
+                     "exec /opt/sst/bin/spm-gui",
+                     display ? display : ":0");
+        }
+    }
 
     child = fork();
     if (child < 0) { close(master); return -1; }

@@ -172,14 +172,54 @@ void pkgdb_add_github(pkgdb_t *db, const char *json_body,
             strncpy(pkg.repo_name, repo_name, sizeof(pkg.repo_name) - 1);
             pkg.source_type = SRC_GITHUB;
 
-            /* Extract version from tag */
-            if (tag) {
-                const char *v = tag;
-                if (*v == 'v' || *v == 'V') v++;
-                strncpy(pkg.version, v, sizeof(pkg.version) - 1);
+            /* Extract version from filename if possible, else from tag.
+             * Filename patterns:
+             *   SSTgcc-11.4.0-sparc.pkg.Z
+             *   SSTgcc-11.4.0-1.sst-sunos5.7-sparc.pkg.Z
+             * Version is the segment after the first '-' that starts
+             * with a digit, up to the next '-' that doesn't look like
+             * a continuation (i.e. doesn't start with a digit). */
+            {
+                const char *dash = strchr(aname, '-');
+                int got_ver = 0;
+                if (dash && dash[1] >= '0' && dash[1] <= '9') {
+                    const char *vs = dash + 1;
+                    const char *ve = vs;
+                    /* Walk forward: keep "11.4.0" or "11.4.0-1" */
+                    while (*ve && *ve != '.' &&
+                           !(ve > vs && *ve == '-' &&
+                             (ve[1] < '0' || ve[1] > '9'))) {
+                        ve++;
+                        /* Consume ".digit" sequences */
+                        while (*ve == '.' &&
+                               ve[1] >= '0' && ve[1] <= '9') {
+                            ve++;
+                            while (*ve >= '0' && *ve <= '9') ve++;
+                        }
+                        /* Consume "-digit" (sub-release like -1) */
+                        if (*ve == '-' && ve[1] >= '0' && ve[1] <= '9') {
+                            ve++;
+                            while (*ve >= '0' && *ve <= '9') ve++;
+                        }
+                    }
+                    if (ve > vs) {
+                        int vlen = ve - vs;
+                        if (vlen >= (int)sizeof(pkg.version))
+                            vlen = sizeof(pkg.version) - 1;
+                        memcpy(pkg.version, vs, vlen);
+                        pkg.version[vlen] = '\0';
+                        got_ver = 1;
+                    }
+                }
+                if (!got_ver && tag) {
+                    const char *v = tag;
+                    if (*v == 'v' || *v == 'V') v++;
+                    strncpy(pkg.version, v, sizeof(pkg.version) - 1);
+                }
             }
 
-            /* Use release name as description */
+            /* Description: prefer human-readable name from filename
+             * (e.g., "SSTgcc" → "gcc 11.4.0") over shared release name */
             if (rel_name) {
                 strncpy(pkg.description, rel_name,
                         sizeof(pkg.description) - 1);
@@ -238,9 +278,31 @@ void pkgdb_add_github(pkgdb_t *db, const char *json_body,
                                 sizeof(pkg.pkg_code) - 1);
                     }
                 }
-                /* Fallback: if no dash in filename, use repo name */
+                /* No-dash SST filename (e.g., SSTprngd.pkg.Z) */
+                if (!dash && aname[0] == 'S' && aname[1] == 'S' &&
+                    aname[2] == 'T') {
+                    const char *dot = strchr(aname + 3, '.');
+                    if (dot) {
+                        int nlen = dot - aname;
+                        char pcode[64];
+                        snprintf(pcode, sizeof(pcode), "%.*s",
+                                 nlen, aname);
+                        strncpy(pkg.pkg_code, pcode,
+                                sizeof(pkg.pkg_code) - 1);
+                        snprintf(pkg.name, sizeof(pkg.name),
+                                 "%.*s", nlen - 3, aname + 3);
+                    }
+                }
+                /* Fallback: if still no name, use repo name */
                 if (!pkg.name[0])
                     strncpy(pkg.name, gh_repo, sizeof(pkg.name) - 1);
+            }
+
+            /* Per-package description when name was extracted from
+             * filename (avoids all sunstorm assets sharing one desc) */
+            if (pkg.name[0] && pkg.version[0]) {
+                snprintf(pkg.description, sizeof(pkg.description),
+                         "%s %s", pkg.name, pkg.version);
             }
 
             add_avail(db, &pkg);
