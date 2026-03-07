@@ -63,6 +63,13 @@ cp ${SRCDIR}/dt/icons/Spm.l.pm ${STAGEDIR}/usr/dt/appconfig/icons/C/
 cp ${SRCDIR}/dt/icons/Spm.m.pm ${STAGEDIR}/usr/dt/appconfig/icons/C/
 cp ${SRCDIR}/dt/icons/Spm.l.bm ${STAGEDIR}/usr/dt/appconfig/icons/C/
 
+# Also stage to share/dt/ so postinstall can copy them (bootstrap fallback)
+mkdir -p ${STAGEDIR}${BASEDIR}/share/dt
+cp ${SRCDIR}/dt/types/spm.dt ${STAGEDIR}${BASEDIR}/share/dt/
+cp ${SRCDIR}/dt/icons/Spm.l.pm ${STAGEDIR}${BASEDIR}/share/dt/
+cp ${SRCDIR}/dt/icons/Spm.m.pm ${STAGEDIR}${BASEDIR}/share/dt/
+cp ${SRCDIR}/dt/icons/Spm.l.bm ${STAGEDIR}${BASEDIR}/share/dt/
+
 # Generate default config if not present
 if [ ! -f ${STAGEDIR}${BASEDIR}/etc/repos.conf ]; then
     cat > ${STAGEDIR}${BASEDIR}/etc/repos.conf <<CONFEOF
@@ -147,6 +154,12 @@ d none /usr/dt/appconfig/icons/C 0755 root bin
 f none /usr/dt/appconfig/icons/C/Spm.l.pm 0644 root bin
 f none /usr/dt/appconfig/icons/C/Spm.m.pm 0644 root bin
 f none /usr/dt/appconfig/icons/C/Spm.l.bm 0644 root bin
+d none ${BASEDIR}/share 0755 root bin
+d none ${BASEDIR}/share/dt 0755 root bin
+f none ${BASEDIR}/share/dt/spm.dt 0644 root bin
+f none ${BASEDIR}/share/dt/Spm.l.pm 0644 root bin
+f none ${BASEDIR}/share/dt/Spm.m.pm 0644 root bin
+f none ${BASEDIR}/share/dt/Spm.l.bm 0644 root bin
 PROTO
 
 # Add depend if present

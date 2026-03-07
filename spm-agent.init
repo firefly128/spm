@@ -5,8 +5,8 @@
 # Install:
 #   cp spm-agent.init /etc/init.d/spm-agent
 #   chmod 755 /etc/init.d/spm-agent
-#   ln -s /etc/init.d/spm-agent /etc/rc2.d/S99spm-agent
-#   ln -s /etc/init.d/spm-agent /etc/rc0.d/K01spm-agent
+#   ln -s /etc/init.d/spm-agent /etc/rc2.d/S90spm-agent
+#   ln -s /etc/init.d/spm-agent /etc/rc0.d/K10spm-agent
 #
 
 AGENT=/opt/sst/bin/spm-agent

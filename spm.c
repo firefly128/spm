@@ -124,7 +124,9 @@ static int cmd_update(void)
         }
 
         if (r->type == REPO_TYPE_TGCWARE) {
-            printf("  [tgcware] %s ...\n", r->name);
+            printf("  [tgcware] %s\n", r->name);
+            printf("    Connecting to %s ...\n", r->url);
+            fflush(stdout);
 
             memset(&resp, 0, sizeof(resp));
             if (http_get(r->url, &resp) == 0 && resp.body) {
@@ -156,7 +158,10 @@ static int cmd_update(void)
                          "https://api.github.com/repos/%s/%s/releases",
                          r->owner, r->repos[j]);
 
-                printf("    %s/%s ...", r->owner, r->repos[j]);
+                printf("    %s/%s ... ", r->owner, r->repos[j]);
+                fflush(stdout);
+
+                printf("connecting... ");
                 fflush(stdout);
 
                 memset(&resp, 0, sizeof(resp));
@@ -530,6 +535,7 @@ static int cmd_upgrade(int argc, char **argv)
     if (argc == 0) {
         /* Upgrade all installed packages */
         printf("Checking for upgrades...\n");
+        fflush(stdout);
         for (i = 0; i < g_db->inst_count; i++) {
             const installed_pkg_t *ip = &g_db->installed[i];
             int aidx = pkgdb_find_avail(g_db, ip->name);

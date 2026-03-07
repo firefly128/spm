@@ -22,8 +22,8 @@ if [ -f ${BASEDIR}/../etc/init.d/spm-agent ]; then
     cp ${BASEDIR}/../etc/init.d/spm-agent /etc/init.d/spm-agent 2>/dev/null
 fi
 if [ -x /etc/init.d/spm-agent ]; then
-    ln -sf /etc/init.d/spm-agent /etc/rc2.d/S99spm-agent 2>/dev/null
-    ln -sf /etc/init.d/spm-agent /etc/rc0.d/K01spm-agent 2>/dev/null
+    ln -sf /etc/init.d/spm-agent /etc/rc2.d/S90spm-agent 2>/dev/null
+    ln -sf /etc/init.d/spm-agent /etc/rc0.d/K10spm-agent 2>/dev/null
     echo "Starting spm update agent..."
     /etc/init.d/spm-agent start
 fi
@@ -74,10 +74,32 @@ echo "Agent: /etc/init.d/spm-agent status"
 
 # Reload CDE actions so Sunstorm Package Manager appears in Application Manager
 if [ -x /usr/dt/bin/dtaction ]; then
-    # Register in System_Admin drawer
+    # Ensure CDE files are installed (needed for bootstrap which doesn't stage them)
+    DTYPES=/usr/dt/appconfig/types/C
+    DICONS=/usr/dt/appconfig/icons/C
+    mkdir -p "${DTYPES}" "${DICONS}" 2>/dev/null
+
+    # Install .dt action file if not already present
+    if [ ! -f "${DTYPES}/spm.dt" -a -f ${BASEDIR}/share/dt/spm.dt ]; then
+        cp ${BASEDIR}/share/dt/spm.dt "${DTYPES}/spm.dt"
+    fi
+    # Install icons if not already present
+    for icon in Spm.l.pm Spm.m.pm Spm.l.bm; do
+        if [ ! -f "${DICONS}/${icon}" -a -f ${BASEDIR}/share/dt/${icon} ]; then
+            cp ${BASEDIR}/share/dt/${icon} "${DICONS}/${icon}"
+        fi
+    done
+
+    # Register in System_Admin drawer — CDE appmanager uses an executable
+    # file whose name matches the ACTION name in the .dt file
     APPDIR=/usr/dt/appconfig/appmanager/C/System_Admin
     mkdir -p "${APPDIR}" 2>/dev/null
-    ln -sf /usr/dt/appconfig/types/C/spm.dt "${APPDIR}/SpmGui" 2>/dev/null
+    cat > "${APPDIR}/SpmGui" <<'ACTEOF'
+#!/bin/sh
+exec /usr/dt/bin/dtaction SpmGui
+ACTEOF
+    chmod 755 "${APPDIR}/SpmGui" 2>/dev/null
+
     /usr/dt/bin/dtaction ReloadActions 2>/dev/null
     echo ""
     echo "CDE desktop integration installed."

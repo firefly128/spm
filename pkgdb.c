@@ -72,7 +72,12 @@ void pkgdb_add_tgcware(pkgdb_t *db, const tgc_index_t *idx,
         const tgc_entry_t *e = &idx->entries[i];
 
         memset(&pkg, 0, sizeof(pkg));
-        strncpy(pkg.name, e->name, sizeof(pkg.name) - 1);
+        /* Differentiate TGCX (extended/64-bit) from TGC (standard) */
+        if (strncmp(e->pkg_code, "TGCX", 4) == 0) {
+            snprintf(pkg.name, sizeof(pkg.name), "%s (64-bit)", e->name);
+        } else {
+            strncpy(pkg.name, e->name, sizeof(pkg.name) - 1);
+        }
         strncpy(pkg.version, e->version, sizeof(pkg.version) - 1);
         pkg.release = e->release;
         strncpy(pkg.arch, e->arch, sizeof(pkg.arch) - 1);
@@ -162,7 +167,6 @@ void pkgdb_add_github(pkgdb_t *db, const char *json_body,
                 continue;
 
             memset(&pkg, 0, sizeof(pkg));
-            strncpy(pkg.name, gh_repo, sizeof(pkg.name) - 1);
             strncpy(pkg.filename, aname, sizeof(pkg.filename) - 1);
             strncpy(pkg.download_url, dl_url, sizeof(pkg.download_url) - 1);
             strncpy(pkg.repo_name, repo_name, sizeof(pkg.repo_name) - 1);
@@ -220,14 +224,23 @@ void pkgdb_add_github(pkgdb_t *db, const char *json_body,
                             /* SST prefix: pkg_code is already in filename */
                             snprintf(pcode, sizeof(pcode), "%.*s",
                                      nlen, aname);
+                            /* Human name: strip SST prefix (SSTgcc → gcc) */
+                            snprintf(pkg.name, sizeof(pkg.name),
+                                     "%.*s", nlen - 3, aname + 3);
                         } else {
                             snprintf(pcode, sizeof(pcode), "JW%.*s",
                                      nlen, aname);
+                            /* Human name: part before first dash */
+                            snprintf(pkg.name, sizeof(pkg.name),
+                                     "%.*s", nlen, aname);
                         }
                         strncpy(pkg.pkg_code, pcode,
                                 sizeof(pkg.pkg_code) - 1);
                     }
                 }
+                /* Fallback: if no dash in filename, use repo name */
+                if (!pkg.name[0])
+                    strncpy(pkg.name, gh_repo, sizeof(pkg.name) - 1);
             }
 
             add_avail(db, &pkg);
@@ -653,17 +666,19 @@ int pkgdb_avail_is_installed(const pkgdb_t *db, int avail_idx)
     if (avail_idx < 0 || avail_idx >= db->avail_count) return 0;
     p = &db->available[avail_idx];
 
-    /* Check by pkg_code against installed list */
+    /* Check by pkg_code and version against installed list */
     if (p->pkg_code[0]) {
         for (i = 0; i < db->inst_count; i++) {
-            if (strcmp(db->installed[i].pkg_code, p->pkg_code) == 0)
+            if (strcmp(db->installed[i].pkg_code, p->pkg_code) == 0 &&
+                strcmp(db->installed[i].version, p->version) == 0)
                 return 1;
         }
     }
 
-    /* Also check by name */
+    /* Also check by name and version */
     for (i = 0; i < db->inst_count; i++) {
-        if (strcasecmp(db->installed[i].name, p->name) == 0)
+        if (strcasecmp(db->installed[i].name, p->name) == 0 &&
+            strcmp(db->installed[i].version, p->version) == 0)
             return 1;
     }
 
@@ -1167,6 +1182,24 @@ int *pkgdb_resolve_deps(pkgdb_t *db, int avail_idx, int *count)
     return n > 0 ? result : NULL;
 }
 
+/* Track visited packages during dep tree printing to avoid cycles */
+static int dep_visited[4096];
+static int dep_visited_count;
+
+static int dep_is_visited(int idx)
+{
+    int i;
+    for (i = 0; i < dep_visited_count; i++)
+        if (dep_visited[i] == idx) return 1;
+    return 0;
+}
+
+static void dep_mark_visited(int idx)
+{
+    if (dep_visited_count < 4096)
+        dep_visited[dep_visited_count++] = idx;
+}
+
 void pkgdb_print_deps(const pkgdb_t *db, int avail_idx, int depth)
 {
     const avail_pkg_t *pkg;
@@ -1177,6 +1210,10 @@ void pkgdb_print_deps(const pkgdb_t *db, int avail_idx, int depth)
     if (avail_idx < 0 || avail_idx >= db->avail_count) return;
     if (depth > 10) { printf("  ... (max depth)\n"); return; }
 
+    /* Reset visited list at top level */
+    if (depth == 0)
+        dep_visited_count = 0;
+
     pkg = &db->available[avail_idx];
 
     for (i = 0; i < depth; i++) printf("  ");
@@ -1186,7 +1223,14 @@ void pkgdb_print_deps(const pkgdb_t *db, int avail_idx, int depth)
 
     if (pkgdb_sys_installed(pkg->pkg_code))
         printf(" (installed)");
+
+    if (depth > 0 && dep_is_visited(avail_idx)) {
+        printf(" (see above)\n");
+        return;
+    }
     printf("\n");
+
+    dep_mark_visited(avail_idx);
 
     if (!pkg->deps[0]) return;
 

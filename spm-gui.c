@@ -647,6 +647,24 @@ static void set_status(const char *msg)
     XmStringFree(xs);
 }
 
+/* Word-wrap long text in-place at ~wrap_col chars on word boundaries */
+static void word_wrap(char *text, int wrap_col)
+{
+    int col = 0;
+    char *p;
+    for (p = text; *p; p++) {
+        if (*p == '\n') { col = 0; continue; }
+        col++;
+        if (col >= wrap_col && (*p == ' ' || *p == ',')) {
+            if (*p == ',') { p++; col++; }
+            if (*p == ' ' || *p == '\0') {
+                *p = '\n';
+                col = 0;
+            }
+        }
+    }
+}
+
 /* ================================================================
  * LOG / INFO PANEL
  * ================================================================ */
@@ -1307,16 +1325,8 @@ static void update_cb(Widget w, XtPointer client, XtPointer call)
     clear_info();
     append_log("Refreshing package index from all repositories...\n\n");
 
-    /* Re-run the index update via forked spm CLI */
-    {
-        int ret;
-        ret = system("spm update 2>&1 | tee /tmp/spm-gui-update.log");
-        if (ret == 0) {
-            append_log("Index update completed successfully.\n");
-        } else {
-            append_log("Index update failed. Check log for details.\n");
-        }
-    }
+    /* Run update in progress dialog (non-blocking with output streaming) */
+    run_in_progress_dialog("Updating Package Index", "spm update 2>&1");
 
     /* Reload the database */
     pkgdb_free(g_db);
@@ -1543,6 +1553,83 @@ static void upgrade_all_cb(Widget w, XtPointer client, XtPointer call)
     run_in_progress_dialog(title, cmd);
 }
 
+/* Install entire distribution (all available SST packages) */
+static void install_distro_cb(Widget w, XtPointer client, XtPointer call)
+{
+    char cmd[8192];
+    int pos, i, count;
+
+    (void)w; (void)client; (void)call;
+
+    if (!show_confirm_dialog("Install Entire Distribution",
+            "Install all available Sunstorm (SST) packages?\n\n"
+            "This may take a while and use significant disk space."))
+        return;
+
+    /* Build install command for all SST packages */
+    pos = snprintf(cmd, sizeof(cmd), "spm install");
+    count = 0;
+    for (i = 0; i < g_db->avail_count && pos < (int)sizeof(cmd) - 64; i++) {
+        const avail_pkg_t *p = &g_db->available[i];
+        if (!pkgdb_is_latest_version(g_db, i)) continue;
+        if (strncmp(p->pkg_code, "SST", 3) != 0) continue;
+        if (pkgdb_avail_is_installed(g_db, i)) continue;
+        pos += snprintf(cmd + pos, sizeof(cmd) - pos, " %s", p->name);
+        count++;
+    }
+    snprintf(cmd + pos, sizeof(cmd) - pos, " 2>&1");
+
+    if (count == 0) {
+        set_status("All Sunstorm packages already installed.");
+        return;
+    }
+
+    {
+        char title[128];
+        snprintf(title, sizeof(title), "Installing %d Sunstorm packages", count);
+        set_status(title);
+        run_in_progress_dialog(title, cmd);
+    }
+    populate_list();
+}
+
+/* Remove entire distribution (all installed SST packages) */
+static void remove_distro_cb(Widget w, XtPointer client, XtPointer call)
+{
+    char cmd[8192];
+    int pos, i, count;
+
+    (void)w; (void)client; (void)call;
+
+    if (!show_confirm_dialog("Remove Entire Distribution",
+            "Remove all installed Sunstorm (SST) packages?\n\n"
+            "This cannot be undone."))
+        return;
+
+    pos = snprintf(cmd, sizeof(cmd), "spm remove");
+    count = 0;
+    for (i = 0; i < g_db->inst_count && pos < (int)sizeof(cmd) - 64; i++) {
+        const installed_pkg_t *p = &g_db->installed[i];
+        if (strncmp(p->pkg_code, "SST", 3) != 0) continue;
+        pos += snprintf(cmd + pos, sizeof(cmd) - pos, " %s", p->name);
+        count++;
+    }
+    snprintf(cmd + pos, sizeof(cmd) - pos, " 2>&1");
+
+    if (count == 0) {
+        set_status("No Sunstorm packages installed.");
+        return;
+    }
+
+    {
+        char title[128];
+        snprintf(title, sizeof(title), "Removing %d Sunstorm packages", count);
+        set_status(title);
+        run_in_progress_dialog(title, cmd);
+    }
+    populate_list();
+}
+
 /* Show dependency tree */
 static void deps_cb(Widget w, XtPointer client, XtPointer call)
 {
@@ -1737,6 +1824,23 @@ static void create_ui(void)
     XtAddCallback(update_menu_btn, XmNactivateCallback, update_cb, NULL);
 
     XtVaCreateManagedWidget("sep1",
+        xmSeparatorWidgetClass, server_pulldown, NULL);
+
+    {
+        Widget install_distro_btn, remove_distro_btn;
+        install_distro_btn = XtVaCreateManagedWidget(
+            "Install Entire Distribution...",
+            xmPushButtonWidgetClass, server_pulldown, NULL);
+        XtAddCallback(install_distro_btn, XmNactivateCallback,
+                      install_distro_cb, NULL);
+        remove_distro_btn = XtVaCreateManagedWidget(
+            "Remove Entire Distribution...",
+            xmPushButtonWidgetClass, server_pulldown, NULL);
+        XtAddCallback(remove_distro_btn, XmNactivateCallback,
+                      remove_distro_cb, NULL);
+    }
+
+    XtVaCreateManagedWidget("sep1b",
         xmSeparatorWidgetClass, server_pulldown, NULL);
 
     quit_menu_btn = XtVaCreateManagedWidget("Quit",
@@ -2123,22 +2227,63 @@ static Widget g_su_dialog;
 static Widget g_su_text;
 static Widget g_su_error_label;
 
+/* Password masking for Motif 1.2 (no XmNpasswordMode) */
+static char g_su_password[256];
+static int  g_su_pw_len;
+
+static void su_pw_modify_cb(Widget w, XtPointer client, XtPointer call)
+{
+    XmTextVerifyCallbackStruct *cbs = (XmTextVerifyCallbackStruct *)call;
+    int start, end, new_len, delta;
+    char *ins;
+
+    (void)w; (void)client;
+
+    start = cbs->startPos;
+    end   = cbs->endPos;
+
+    /* Handle deletion */
+    if (start < end) {
+        delta = end - start;
+        memmove(g_su_password + start, g_su_password + end,
+                g_su_pw_len - end);
+        g_su_pw_len -= delta;
+        g_su_password[g_su_pw_len] = '\0';
+    }
+
+    /* Handle insertion */
+    ins = cbs->text->ptr;
+    new_len = cbs->text->length;
+    if (ins && new_len > 0) {
+        if (g_su_pw_len + new_len < (int)sizeof(g_su_password) - 1) {
+            memmove(g_su_password + start + new_len,
+                    g_su_password + start,
+                    g_su_pw_len - start);
+            memcpy(g_su_password + start, ins, new_len);
+            g_su_pw_len += new_len;
+            g_su_password[g_su_pw_len] = '\0';
+            /* Replace display text with bullets */
+            memset(cbs->text->ptr, '*', new_len);
+        }
+    }
+}
+
 static void su_ok_cb(Widget w, XtPointer client, XtPointer call)
 {
-    char *password;
     const char *display;
     char *argv0 = (char *)client;
 
     (void)w; (void)call;
 
-    password = XmTextFieldGetString(g_su_text);
     display = getenv("DISPLAY");
 
-    if (try_su_reexec(password, display, argv0) == 0) {
+    if (try_su_reexec(g_su_password, display, argv0) == 0) {
         /* Should not reach here — parent exits in try_su_reexec */
         g_su_done = 1;
     } else {
         /* Bad password — show error, let user retry */
+        g_su_pw_len = 0;
+        g_su_password[0] = '\0';
         XmTextFieldSetString(g_su_text, "");
         if (g_su_error_label) {
             XtVaSetValues(g_su_error_label,
@@ -2148,8 +2293,6 @@ static void su_ok_cb(Widget w, XtPointer client, XtPointer call)
         }
         g_su_failed = 1;
     }
-
-    XtFree(password);
 }
 
 static void su_cancel_cb(Widget w, XtPointer client, XtPointer call)
@@ -2213,13 +2356,11 @@ static int elevate_to_root(int *argc_p, char *argv[])
     pw_field = XmCreateTextField(form, "pwField", args, n);
     XtManageChild(pw_field);
 
-    /* Mask password input — replace echo char */
+    /* Mask password input via modify-verify callback (Motif 1.2) */
     XtVaSetValues(pw_field, XmNverifyBell, False, NULL);
-    /* Note: Motif 1.2 doesn't have XmNpasswordMode; we'll use
-     * a modify-verify callback to mask chars manually. We create
-     * a simple approach: just document that the field is for password.
-     * For Solaris 7 Motif 1.2, we store the real password and
-     * display bullet chars. */
+    g_su_pw_len = 0;
+    g_su_password[0] = '\0';
+    XtAddCallback(pw_field, XmNmodifyVerifyCallback, su_pw_modify_cb, NULL);
 
     g_su_text = pw_field;
 
@@ -2321,15 +2462,34 @@ static void check_startup_upgrades(void)
         n == 1 ? "has a" : "have",
         n == 1 ? "" : "s");
 
-    for (i = 0; i < g_db->inst_count && pos < (int)sizeof(msg) - 128; i++) {
-        const installed_pkg_t *ip = &g_db->installed[i];
-        int avail = pkgdb_find_avail(g_db, ip->name);
-        if (avail >= 0) {
-            const avail_pkg_t *ap = &g_db->available[avail];
-            if (strcmp(ap->version, ip->version) != 0) {
-                pos += snprintf(msg + pos, sizeof(msg) - pos,
-                    "  %s: %s -> %s\n",
-                    ip->name, ip->version, ap->version);
+    if (n > 10) {
+        /* Compact comma-delimited list for large number of updates */
+        int first = 1;
+        for (i = 0; i < g_db->inst_count && pos < (int)sizeof(msg) - 64; i++) {
+            const installed_pkg_t *ip = &g_db->installed[i];
+            int avail = pkgdb_find_avail(g_db, ip->name);
+            if (avail >= 0) {
+                const avail_pkg_t *ap = &g_db->available[avail];
+                if (strcmp(ap->version, ip->version) != 0) {
+                    pos += snprintf(msg + pos, sizeof(msg) - pos,
+                        "%s%s", first ? "" : ", ", ip->name);
+                    first = 0;
+                }
+            }
+        }
+        pos += snprintf(msg + pos, sizeof(msg) - pos, "\n");
+        word_wrap(msg, 60);
+    } else {
+        for (i = 0; i < g_db->inst_count && pos < (int)sizeof(msg) - 128; i++) {
+            const installed_pkg_t *ip = &g_db->installed[i];
+            int avail = pkgdb_find_avail(g_db, ip->name);
+            if (avail >= 0) {
+                const avail_pkg_t *ap = &g_db->available[avail];
+                if (strcmp(ap->version, ip->version) != 0) {
+                    pos += snprintf(msg + pos, sizeof(msg) - pos,
+                        "  %s: %s -> %s\n",
+                        ip->name, ip->version, ap->version);
+                }
             }
         }
     }

@@ -292,8 +292,32 @@ static void run_agent(void)
     agent_log("spm-agent started (pid %ld, interval %d sec)",
               (long)getpid(), interval);
 
+    /* Check if we've already run recently (avoid redundant check on quick restart) */
+    {
+        struct stat sb;
+        if (stat(SPM_UPDATE_STATUS, &sb) == 0) {
+            time_t now = time(NULL);
+            if (now - sb.st_mtime < 300) {
+                agent_log("last check was %ld seconds ago, skipping initial check",
+                          (long)(now - sb.st_mtime));
+                goto skip_initial;
+            }
+        }
+    }
+
     /* Initial check on startup */
     check_for_updates();
+
+    /* Boot notification via console */
+    {
+        FILE *con = fopen("/dev/console", "w");
+        if (con) {
+            fprintf(con, "spm-agent: update check complete\n");
+            fclose(con);
+        }
+    }
+
+skip_initial:
 
     elapsed = 0;
 
