@@ -117,8 +117,11 @@ static int load_openssl(void)
 {
     if (ssl_loaded) return 0;
 
-    /* Load libcrypto first (libssl depends on it) */
-    crypto_lib_handle = dlopen("/usr/tgcware/lib/libcrypto.so", RTLD_NOW | RTLD_GLOBAL);
+    /* Load libcrypto first (libssl depends on it).
+     * Search order: Sunstorm (/opt/sst/lib), TGCware, then system. */
+    crypto_lib_handle = dlopen("/opt/sst/lib/libcrypto.so", RTLD_NOW | RTLD_GLOBAL);
+    if (!crypto_lib_handle)
+        crypto_lib_handle = dlopen("/usr/tgcware/lib/libcrypto.so", RTLD_NOW | RTLD_GLOBAL);
     if (!crypto_lib_handle)
         crypto_lib_handle = dlopen("libcrypto.so", RTLD_NOW | RTLD_GLOBAL);
     if (!crypto_lib_handle) {
@@ -126,7 +129,9 @@ static int load_openssl(void)
         return -1;
     }
 
-    ssl_lib_handle = dlopen("/usr/tgcware/lib/libssl.so", RTLD_NOW | RTLD_GLOBAL);
+    ssl_lib_handle = dlopen("/opt/sst/lib/libssl.so", RTLD_NOW | RTLD_GLOBAL);
+    if (!ssl_lib_handle)
+        ssl_lib_handle = dlopen("/usr/tgcware/lib/libssl.so", RTLD_NOW | RTLD_GLOBAL);
     if (!ssl_lib_handle)
         ssl_lib_handle = dlopen("libssl.so", RTLD_NOW | RTLD_GLOBAL);
     if (!ssl_lib_handle) {
@@ -186,7 +191,7 @@ static int load_openssl(void)
 
 /* Global SSL context */
 static SSL_CTX *g_ssl_ctx = NULL;
-static char g_ca_bundle[512] = "/usr/tgcware/etc/curl-ca-bundle.pem";
+static char g_ca_bundle[512] = "/opt/sst/etc/ssl/certs/ca-bundle.crt";
 
 /* ================================================================
  * SSL INIT / SHUTDOWN
@@ -220,21 +225,21 @@ int http_init(void)
     dl_SSL_CTX_ctrl(g_ssl_ctx, SPM_SSL_CTRL_OPTIONS,
                     SPM_SSL_OP_NO_SSLv2 | SPM_SSL_OP_NO_SSLv3, NULL);
 
-    /* Load CA certificates for verification */
+    /* Load CA certificates for verification.
+     * Search order: Sunstorm, TGCware, system. */
     if (dl_SSL_CTX_load_verify_locations(g_ssl_ctx, g_ca_bundle, NULL) != 1) {
-        /* Try alternate paths */
         if (dl_SSL_CTX_load_verify_locations(g_ssl_ctx,
                 "/usr/tgcware/etc/curl-ca-bundle.pem", NULL) != 1) {
-          if (dl_SSL_CTX_load_verify_locations(g_ssl_ctx,
-                "/usr/tgcware/share/curl/curl-ca-bundle.crt", NULL) != 1) {
             if (dl_SSL_CTX_load_verify_locations(g_ssl_ctx,
-                    "/etc/ssl/certs/ca-certificates.crt", NULL) != 1) {
-                fprintf(stderr, "spm: warning: cannot load CA certs\n");
-                fprintf(stderr, "  tried: %s\n", g_ca_bundle);
-                fprintf(stderr, "  HTTPS verification disabled\n");
-                dl_SSL_CTX_set_verify(g_ssl_ctx, SPM_SSL_VERIFY_NONE, NULL);
-                return 0;
-              }
+                    "/usr/tgcware/share/curl/curl-ca-bundle.crt", NULL) != 1) {
+                if (dl_SSL_CTX_load_verify_locations(g_ssl_ctx,
+                        "/etc/ssl/certs/ca-certificates.crt", NULL) != 1) {
+                    fprintf(stderr, "spm: warning: cannot load CA certs\n");
+                    fprintf(stderr, "  tried: %s\n", g_ca_bundle);
+                    fprintf(stderr, "  HTTPS verification disabled\n");
+                    dl_SSL_CTX_set_verify(g_ssl_ctx, SPM_SSL_VERIFY_NONE, NULL);
+                    return 0;
+                }
             }
         }
     }

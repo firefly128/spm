@@ -70,7 +70,7 @@ if [ ! -f ${STAGEDIR}${BASEDIR}/etc/repos.conf ]; then
 #
 # SSL settings (CA certificate bundle for HTTPS)
 [ssl]
-ca_bundle = /usr/tgcware/etc/curl-ca-bundle.pem
+ca_bundle = /opt/sst/etc/ssl/certs/ca-bundle.crt
 
 [agent]
 interval = 21600
@@ -84,12 +84,20 @@ url = https://jupiterrise.com/tgcware/sunos5.7_sparc/stable/
 source = https://github.com/AstroVPK/tgcwarev2-for-solaris
 enabled = yes
 
-# Julian's GitHub releases
+# firefly128 GitHub releases
 [repo:firefly128]
 type = github
 name = firefly128 SPARC Apps
 owner = firefly128
 repos = pizzafool,sparccord,wesnoth-sparc
+enabled = yes
+
+# Sunstorm Distribution
+[repo:sunstorm]
+type = github
+name = Sunstorm Distribution
+owner = firefly128
+repos = sunstorm
 enabled = yes
 CONFEOF
 fi

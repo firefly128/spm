@@ -1,8 +1,9 @@
 # spm requires Sunstorm OpenSSL for HTTPS.
-# Also needs Sunstorm libsolcompat and zlib.
-P SSTossl Sunstorm OpenSSL TLS/SSL library
+# Bootstrap chain: zlib, libsolcompat, prngd, openssl.
+P SSTzlib  Sunstorm compression library
 P SSTlsolc Sunstorm POSIX/C99 compatibility shim
-P SSTzlib Sunstorm compression library
+P SSTprngd Sunstorm entropy daemon for OpenSSL
+P SSTossl  Sunstorm OpenSSL TLS/SSL library
 # CDE is needed for the GUI (standard Solaris install)
 P SUNWmfrun Motif RunTime Kit
 P SUNWxwplt X Window System platform software

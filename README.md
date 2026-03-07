@@ -2,11 +2,14 @@
 
 A package manager for Solaris 7 SPARC that aggregates packages from multiple
 sources: [TGCware](https://jupiterrise.com/tgcware/sunos5.7_sparc/stable/)
-binary packages and GitHub release assets.
+binary packages, [Sunstorm](https://github.com/firefly128/sunstorm) distribution
+packages, and GitHub release assets.
 
-Designed for vintage SPARC hardware running Solaris 7 (SunOS 5.7). Uses native
-OpenSSL from TGCware for direct HTTPS access to package repositories — no proxy
-or bridge server required.
+Designed for vintage SPARC hardware running Solaris 7 (SunOS 5.7). Loads OpenSSL
+at runtime via `dlopen` (from Sunstorm or TGCware) for direct HTTPS access to
+package repositories — no proxy or bridge server required.
+
+Part of the [Sunstorm](https://github.com/firefly128/sunstorm) distribution.
 
 ## Features
 
@@ -23,11 +26,49 @@ or bridge server required.
 ## Requirements
 
 - Solaris 7 (SunOS 5.7) on SPARC
-- TGCware GCC 4.7+ (`/usr/tgcware/gcc47/bin/gcc`) or system `cc`
-- TGCware OpenSSL (`/usr/tgcware/lib/libssl.so`)
-- TGCware curl CA bundle (`/usr/tgcware/etc/curl-ca-bundle.pem`) — or any CA bundle
+- OpenSSL — Sunstorm (`/opt/sst/lib/libssl.so`) or TGCware (`/usr/tgcware/lib/libssl.so`)
+- CA certificate bundle (`/opt/sst/etc/ssl/certs/ca-bundle.crt` or TGCware equivalent)
 - CDE/Motif (for GUI: `/usr/dt/lib/libXm.so`, `/usr/openwin/lib/libX11.so`)
 - Network access to the internet (DNS + HTTPS)
+
+For building from source: TGCware GCC 4.7+ (`/usr/tgcware/gcc47/bin/gcc`).
+
+## Bootstrap
+
+spm requires OpenSSL for HTTPS, but OpenSSL itself is a Sunstorm package.
+To break this circular dependency, the Sunstorm project provides a
+**bootstrap bundle** — a tarball containing the 5 prerequisite packages
+that can be installed using only base Solaris tools:
+
+```
+SSTzlib   → zlib compression library
+SSTlsolc  → POSIX/C99 compatibility shim (libsolcompat)
+SSTprngd  → Pseudo-random number generator daemon
+SSTossl   → OpenSSL cryptography toolkit
+SSTspm    → Sunstorm Package Manager (this package)
+```
+
+### Installing from the bootstrap bundle
+
+```sh
+# Transfer sunstorm-bootstrap-1.0.0.tar.Z to the Solaris system, then:
+uncompress sunstorm-bootstrap-1.0.0.tar.Z
+tar xf sunstorm-bootstrap-1.0.0.tar
+cd sunstorm-bootstrap-1.0.0
+sh sunstorm-bootstrap.sh
+```
+
+The script installs all 5 packages in dependency order using `pkgadd`,
+starts `prngd`, and verifies the installation. After bootstrap:
+
+```sh
+PATH=/opt/sst/bin:$PATH; export PATH
+spm update
+spm install bash gcc curl   # install anything you need
+```
+
+See the [Sunstorm](https://github.com/firefly128/sunstorm) repo for
+bootstrap bundle downloads and the full package list.
 
 ## Building
 
@@ -147,7 +188,7 @@ Configuration is stored in `/opt/sst/etc/repos.conf`:
 ```ini
 # SSL settings
 [ssl]
-ca_bundle = /usr/tgcware/etc/curl-ca-bundle.pem
+ca_bundle = /opt/sst/etc/ssl/certs/ca-bundle.crt
 
 # Background agent settings
 [agent]
@@ -168,6 +209,14 @@ type = github
 name = firefly128 SPARC Apps
 owner = firefly128
 repos = pizzafool,sparccord,wesnoth-sparc
+enabled = yes
+
+# Sunstorm distribution packages
+[repo:sunstorm]
+type = github
+name = Sunstorm Distribution
+owner = firefly128
+repos = sunstorm
 enabled = yes
 ```
 
@@ -232,9 +281,11 @@ configured repo. Indexes `.pkg` and `.gz` assets as installable packages.
 └─────────────┘
 ```
 
-spm talks HTTPS directly using the TGCware OpenSSL 1.0.2 library.
-No proxy or bridge server is needed.  CA certificates come from the
-TGCware curl package's CA bundle.
+spm talks HTTPS directly using OpenSSL loaded at runtime via `dlopen`.
+It searches for `libssl.so` and `libcrypto.so` in `/opt/sst/lib` (Sunstorm),
+then `/usr/tgcware/lib` (TGCware), then the system library path.
+No proxy or bridge server is needed.  CA certificates come from
+`/opt/sst/etc/ssl/certs/ca-bundle.crt` with fallbacks to TGCware paths.
 
 ## How Dependencies Work
 

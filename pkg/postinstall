@@ -33,7 +33,7 @@ if [ ! -f ${BASEDIR}/etc/repos.conf ]; then
     cat > ${BASEDIR}/etc/repos.conf <<CONFEOF
 # spm repository configuration
 [ssl]
-ca_bundle = /usr/tgcware/etc/curl-ca-bundle.pem
+ca_bundle = /opt/sst/etc/ssl/certs/ca-bundle.crt
 
 [agent]
 interval = 21600

@@ -1,14 +1,15 @@
 # spm Makefile for Solaris 7 SPARC
 #
 # Sunstorm Package Manager for Solaris 7 SPARC.
-# Uses OpenSSL (TGCware) loaded at runtime via dlopen for HTTPS.
+# Uses OpenSSL loaded at runtime via dlopen for HTTPS.
+# Search order: Sunstorm (/opt/sst/lib), TGCware, then system.
 #
 # Builds three targets:
 #   spm       - CLI package manager
 #   spm-gui   - Motif/CDE graphical package manager
 #   spm-agent - Background update check daemon
 #
-# Requires: TGCware OpenSSL (loaded at runtime via dlopen)
+# Requires: OpenSSL (Sunstorm SSTossl or TGCware, loaded at runtime)
 #           Solaris socket/dl libs (-lsocket -lnsl -ldl)
 #           Motif/CDE (for GUI: -lXm -lXt -lX11)
 
@@ -19,12 +20,15 @@ CC = /usr/tgcware/gcc47/bin/gcc
 # TGCware paths for OpenSSL headers and libs
 TGCWARE = /usr/tgcware
 
+# Sunstorm install prefix
+SSTDIR = /opt/sst
+
 # Motif / X11 / CDE paths
 MOTIFDIR = /usr/dt
 OPENWINDIR = /usr/openwin
 
-CFLAGS = -O2 -Wall -I$(TGCWARE)/include
-LDFLAGS = -s -L$(TGCWARE)/lib -R$(TGCWARE)/lib
+CFLAGS = -O2 -Wall -I$(TGCWARE)/include -I$(SSTDIR)/include
+LDFLAGS = -s -L$(SSTDIR)/lib -R$(SSTDIR)/lib -L$(TGCWARE)/lib -R$(TGCWARE)/lib
 LIBS = -lsocket -lnsl -ldl
 
 # Motif/X11 link flags (GUI only)
