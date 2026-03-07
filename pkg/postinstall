@@ -52,6 +52,13 @@ name = firefly128 SPARC Apps
 owner = firefly128
 repos = pizzafool,sparccord,wesnoth-sparc
 enabled = yes
+
+[repo:sunstorm]
+type = github
+name = Sunstorm Distribution
+owner = firefly128
+repos = sunstorm
+enabled = yes
 CONFEOF
 fi
 
@@ -67,10 +74,14 @@ echo "Agent: /etc/init.d/spm-agent status"
 
 # Reload CDE actions so Sunstorm Package Manager appears in Application Manager
 if [ -x /usr/dt/bin/dtaction ]; then
+    # Register in System_Admin drawer
+    APPDIR=/usr/dt/appconfig/appmanager/C/System_Admin
+    mkdir -p "${APPDIR}" 2>/dev/null
+    ln -sf /usr/dt/appconfig/types/C/spm.dt "${APPDIR}/SpmGui" 2>/dev/null
     /usr/dt/bin/dtaction ReloadActions 2>/dev/null
     echo ""
     echo "CDE desktop integration installed."
-    echo "Look for 'Sunstorm Package Manager' in the Application Manager."
+    echo "Look for 'Sunstorm Package Manager' in Application Manager > System_Admin."
 fi
 
 exit 0

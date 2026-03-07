@@ -158,7 +158,7 @@ void pkgdb_add_github(pkgdb_t *db, const char *json_body,
             if (!aname || !dl_url) continue;
 
             /* Only index .pkg files (SVR4 packages for Solaris) */
-            if (!strstr(aname, ".pkg") && !strstr(aname, ".gz"))
+            if (!strstr(aname, ".pkg"))
                 continue;
 
             memset(&pkg, 0, sizeof(pkg));
@@ -206,14 +206,24 @@ void pkgdb_add_github(pkgdb_t *db, const char *json_body,
                      "%s/%s", owner, gh_repo);
 
             /* Try to extract pkg_code from filename pattern  */
-            /* Typically: name-version-arch.pkg */
+            /* Sunstorm: SSTgcc-11.4.0-1.sst-sunos5.7-sparc.pkg.Z
+             * The pkg_code IS the part before the first '-' (e.g. SSTgcc).
+             * Other GitHub: name-version.pkg → prepend "JW" */
             {
                 char *dash = strchr(aname, '-');
                 if (dash) {
                     int nlen = dash - aname;
                     char pcode[64];
-                    if (nlen > 0 && nlen < 20) {
-                        snprintf(pcode, sizeof(pcode), "JW%.*s", nlen, aname);
+                    if (nlen > 0 && nlen < (int)sizeof(pcode) - 1) {
+                        if (nlen >= 3 && aname[0] == 'S' &&
+                            aname[1] == 'S' && aname[2] == 'T') {
+                            /* SST prefix: pkg_code is already in filename */
+                            snprintf(pcode, sizeof(pcode), "%.*s",
+                                     nlen, aname);
+                        } else {
+                            snprintf(pcode, sizeof(pcode), "JW%.*s",
+                                     nlen, aname);
+                        }
                         strncpy(pkg.pkg_code, pcode,
                                 sizeof(pkg.pkg_code) - 1);
                     }
@@ -845,66 +855,91 @@ int pkgdb_install(pkgdb_t *db, int avail_idx)
         }
     }
 
-    /* For TGCware: packages are gzip-compressed pkg streams.
-     * Use: gunzip -c file.gz | pkgadd -d /dev/stdin -n all
-     * For GitHub: .pkg files can be used directly with pkgadd -d file */
-    if (pkg->source_type == SRC_TGCWARE) {
-        char uncompressed[512];
-        snprintf(uncompressed, sizeof(uncompressed), "%s/%s.unpacked",
-                 SPM_CACHE, pkg->name);
+    /* Determine decompression method from filename:
+     *   .pkg.Z  → uncompress (Sunstorm / classic SVR4)
+     *   .gz     → gzip -dc   (TGCware)
+     *   .pkg    → none       (bare datastream)
+     */
+    {
+        const char *fn = pkg->filename;
+        int fnlen = strlen(fn);
+        int needs_decompress = 0;
+        int use_compress = 0;  /* 1 = uncompress, 0 = gzip */
 
-        /* Decompress */
-        snprintf(cmd, sizeof(cmd),
-                 "/usr/bin/gzip -dc %s > %s 2>/dev/null",
-                 cache_path, uncompressed);
-        printf("  Decompressing...\n");
-        if (system(cmd) != 0) {
-            /* Try gunzip from tgcware */
-            snprintf(cmd, sizeof(cmd),
-                     "/usr/tgcware/bin/gzip -dc %s > %s 2>/dev/null",
-                     cache_path, uncompressed);
-            if (system(cmd) != 0) {
-                fprintf(stderr, "spm: decompression failed\n");
-                return -1;
+        if (fnlen > 6 && strcmp(fn + fnlen - 6, ".pkg.Z") == 0) {
+            needs_decompress = 1;
+            use_compress = 1;
+        } else if (fnlen > 3 && strcmp(fn + fnlen - 3, ".gz") == 0) {
+            needs_decompress = 1;
+            use_compress = 0;
+        }
+
+        if (needs_decompress) {
+            char uncompressed[512];
+            snprintf(uncompressed, sizeof(uncompressed), "%s/%s.unpacked",
+                     SPM_CACHE, pkg->name);
+
+            printf("  Decompressing...\n");
+            if (use_compress) {
+                /* compress(1) / .Z files — use uncompress */
+                snprintf(cmd, sizeof(cmd),
+                         "/usr/bin/uncompress -c %s > %s 2>/dev/null",
+                         cache_path, uncompressed);
+                if (system(cmd) != 0) {
+                    fprintf(stderr, "spm: uncompress failed\n");
+                    return -1;
+                }
+            } else {
+                /* gzip / .gz files */
+                snprintf(cmd, sizeof(cmd),
+                         "/usr/bin/gzip -dc %s > %s 2>/dev/null",
+                         cache_path, uncompressed);
+                if (system(cmd) != 0) {
+                    snprintf(cmd, sizeof(cmd),
+                             "/usr/tgcware/bin/gzip -dc %s > %s 2>/dev/null",
+                             cache_path, uncompressed);
+                    if (system(cmd) != 0) {
+                        fprintf(stderr, "spm: decompression failed\n");
+                        return -1;
+                    }
+                }
             }
-        }
 
-        /* Backup current package for rollback if it's installed */
-        if (pkg->pkg_code[0] && pkgdb_sys_installed(pkg->pkg_code)) {
-            char backup[512];
-            snprintf(backup, sizeof(backup), "%s/%s-%s.bak",
-                     SPM_ROLLBACK, pkg->name, pkg->version);
-            /* pkgtrans the current package to a file for rollback */
+            /* Backup current package for rollback if it's installed */
+            if (pkg->pkg_code[0] && pkgdb_sys_installed(pkg->pkg_code)) {
+                char backup[512];
+                snprintf(backup, sizeof(backup), "%s/%s-%s.bak",
+                         SPM_ROLLBACK, pkg->name, pkg->version);
+                snprintf(cmd, sizeof(cmd),
+                         "/usr/bin/pkgtrans -s /var/spool/pkg %s %s 2>/dev/null",
+                         backup, pkg->pkg_code);
+                system(cmd); /* best effort */
+            }
+
+            printf("  Running pkgadd...\n");
             snprintf(cmd, sizeof(cmd),
-                     "/usr/bin/pkgtrans -s /var/spool/pkg %s %s 2>/dev/null",
-                     backup, pkg->pkg_code);
-            system(cmd); /* best effort */
-        }
+                     "/usr/sbin/pkgadd -n -a %s -d %s all 2>&1",
+                     pkgadd_admin_file(), uncompressed);
+            rc = system(cmd);
+            unlink(uncompressed);
+        } else {
+            /* Bare .pkg datastream — use directly */
+            if (pkg->pkg_code[0] && pkgdb_sys_installed(pkg->pkg_code)) {
+                char backup[512];
+                snprintf(backup, sizeof(backup), "%s/%s-%s.bak",
+                         SPM_ROLLBACK, pkg->name, pkg->version);
+                snprintf(cmd, sizeof(cmd),
+                         "/usr/bin/pkgtrans -s /var/spool/pkg %s %s 2>/dev/null",
+                         backup, pkg->pkg_code);
+                system(cmd);
+            }
 
-        /* Install with pkgadd */
-        printf("  Running pkgadd...\n");
-        snprintf(cmd, sizeof(cmd),
-                 "/usr/sbin/pkgadd -n -a %s -d %s all 2>&1",
-                 pkgadd_admin_file(), uncompressed);
-        rc = system(cmd);
-        unlink(uncompressed);
-    } else {
-        /* GitHub release: direct .pkg file */
-        if (pkg->pkg_code[0] && pkgdb_sys_installed(pkg->pkg_code)) {
-            char backup[512];
-            snprintf(backup, sizeof(backup), "%s/%s-%s.bak",
-                     SPM_ROLLBACK, pkg->name, pkg->version);
+            printf("  Running pkgadd...\n");
             snprintf(cmd, sizeof(cmd),
-                     "/usr/bin/pkgtrans -s /var/spool/pkg %s %s 2>/dev/null",
-                     backup, pkg->pkg_code);
-            system(cmd);
+                     "/usr/sbin/pkgadd -n -a %s -d %s all 2>&1",
+                     pkgadd_admin_file(), cache_path);
+            rc = system(cmd);
         }
-
-        printf("  Running pkgadd...\n");
-        snprintf(cmd, sizeof(cmd),
-                 "/usr/sbin/pkgadd -n -a %s -d %s all 2>&1",
-                 pkgadd_admin_file(), cache_path);
-        rc = system(cmd);
     }
 
     if (rc != 0) {

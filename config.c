@@ -19,6 +19,13 @@
  *   owner = firefly128
  *   repos = pizzafool,sparccord,wesnoth-sparc
  *   enabled = yes
+ *
+ *   [repo:sunstorm]
+ *   type = github
+ *   name = Sunstorm Distribution
+ *   owner = firefly128
+ *   repos = sunstorm
+ *   enabled = yes
  */
 
 #include "config.h"
@@ -78,8 +85,14 @@ void config_defaults(spm_config_t *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
 
-    /* Default CA bundle: TGCware curl ships one */
-    strcpy(cfg->ca_bundle, SPM_CA_BUNDLE);
+    /* Default CA bundle: prefer Sunstorm OpenSSL, fall back to TGCware */
+    {
+        struct stat _st;
+        if (stat(SPM_CA_BUNDLE_ALT, &_st) == 0)
+            strcpy(cfg->ca_bundle, SPM_CA_BUNDLE_ALT);
+        else
+            strcpy(cfg->ca_bundle, SPM_CA_BUNDLE);
+    }
 
     /* Agent defaults */
     cfg->agent_interval = AGENT_DEFAULT_INTERVAL;
@@ -106,7 +119,16 @@ void config_defaults(spm_config_t *cfg)
     strcpy(cfg->repos[1].repos[2], "wesnoth-sparc");
     cfg->repos[1].repo_count = 3;
 
-    cfg->repo_count = 2;
+    /* Sunstorm distribution packages */
+    cfg->repos[2].type = REPO_TYPE_GITHUB;
+    cfg->repos[2].enabled = 1;
+    strcpy(cfg->repos[2].name, "sunstorm");
+    strcpy(cfg->repos[2].display_name, "Sunstorm Distribution");
+    strcpy(cfg->repos[2].owner, "firefly128");
+    strcpy(cfg->repos[2].repos[0], "sunstorm");
+    cfg->repos[2].repo_count = 1;
+
+    cfg->repo_count = 3;
 }
 
 int config_load(spm_config_t *cfg)

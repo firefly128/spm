@@ -21,6 +21,7 @@ rm -f /usr/local/bin/spm-gui 2>/dev/null
 rm -f /usr/local/bin/spm-agent 2>/dev/null
 
 # Remove CDE integration files
+rm -f /usr/dt/appconfig/appmanager/C/System_Admin/SpmGui 2>/dev/null
 rm -f /usr/dt/appconfig/types/C/spm.dt 2>/dev/null
 rm -f /usr/dt/appconfig/icons/C/Spm.l.pm 2>/dev/null
 rm -f /usr/dt/appconfig/icons/C/Spm.m.pm 2>/dev/null

@@ -21,7 +21,8 @@
 #define SPM_AGENT_LOG SPM_VAR  "/agent.log"
 #define SPM_UPDATE_STATUS SPM_VAR "/update.status"
 
-#define SPM_CA_BUNDLE "/usr/tgcware/etc/curl-ca-bundle.pem"
+#define SPM_CA_BUNDLE     "/usr/tgcware/etc/curl-ca-bundle.pem"
+#define SPM_CA_BUNDLE_ALT SPM_BASE "/etc/ssl/certs/ca-bundle.crt"
 
 #define REPO_TYPE_TGCWARE   1
 #define REPO_TYPE_GITHUB    2
