@@ -139,9 +139,8 @@ d none ${BASEDIR}/var 0755 root bin
 d none ${BASEDIR}/var/cache 0755 root bin
 d none ${BASEDIR}/var/index 0755 root bin
 d none ${BASEDIR}/var/rollback 0755 root bin
-d none ${BASEDIR}/man 0755 root bin
-d none ${BASEDIR}/man/man1m 0755 root bin
-f none ${BASEDIR}/man/man1m/spm.1m 0644 root bin
+d none /etc/init.d 0755 root sys
+f none /etc/init.d/spm-agent 0755 root sys
 d none /usr/dt/appconfig/types/C 0755 root bin
 f none /usr/dt/appconfig/types/C/spm.dt 0644 root bin
 d none /usr/dt/appconfig/icons/C 0755 root bin
@@ -160,6 +159,13 @@ if [ -f ${STAGEDIR}${BASEDIR}/README.md ]; then
     echo "f none ${BASEDIR}/README.md 0644 root bin" >> ${PKGDIR}/prototype
 fi
 
+# Add man page if staged
+if [ -f ${STAGEDIR}${BASEDIR}/man/man1m/spm.1m ]; then
+    echo "d none ${BASEDIR}/man 0755 root bin" >> ${PKGDIR}/prototype
+    echo "d none ${BASEDIR}/man/man1m 0755 root bin" >> ${PKGDIR}/prototype
+    echo "f none ${BASEDIR}/man/man1m/spm.1m 0644 root bin" >> ${PKGDIR}/prototype
+fi
+
 echo "Prototype:"
 cat ${PKGDIR}/prototype
 echo ""
@@ -174,16 +180,17 @@ fi
 
 # Convert to datastream
 echo "--- Creating datastream package ---"
-OUTPKG="${SRCDIR}/spm-${VERSION}-sparc.pkg"
+OUTPKG="/tmp/${PKGNAME}-${VERSION}-sparc.pkg"
 pkgtrans -s /tmp/spm-spool ${OUTPKG} ${PKGNAME}
+
+# Compress with Solaris compress
+echo "--- Compressing ---"
+compress -f ${OUTPKG}
+OUTPKG="${OUTPKG}.Z"
 
 echo ""
 echo "=== Package built successfully ==="
 echo "Output: ${OUTPKG}"
 ls -la ${OUTPKG}
 echo ""
-echo "Install with: pkgadd -d ${OUTPKG}"
-echo ""
-echo "After install, add to PATH:"
-echo "  PATH=/opt/sst/bin:\$PATH; export PATH"
-echo "  spm update"
+echo "Install with: zcat ${OUTPKG} | pkgadd -d /dev/stdin"

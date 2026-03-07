@@ -28,13 +28,13 @@ MOTIFDIR = /usr/dt
 OPENWINDIR = /usr/openwin
 
 CFLAGS = -O2 -Wall -D_REENTRANT -I$(TGCWARE)/include -I$(SSTDIR)/include
-LDFLAGS = -s -L$(SSTDIR)/lib -R$(SSTDIR)/lib -L$(TGCWARE)/lib -R$(TGCWARE)/lib
+LDFLAGS = -s -L$(SSTDIR)/lib -Wl,-R,$(SSTDIR)/lib -L$(TGCWARE)/lib -Wl,-R,$(TGCWARE)/lib
 LIBS = -lsolcompat -lsocket -lnsl -ldl
 
 # Motif/X11 link flags (GUI only)
 MOTIF_CFLAGS = -I$(MOTIFDIR)/include -I$(OPENWINDIR)/include
-MOTIF_LDFLAGS = -L$(MOTIFDIR)/lib -R$(MOTIFDIR)/lib \
-                -L$(OPENWINDIR)/lib -R$(OPENWINDIR)/lib
+MOTIF_LDFLAGS = -L$(MOTIFDIR)/lib -Wl,-R,$(MOTIFDIR)/lib \
+                -L$(OPENWINDIR)/lib -Wl,-R,$(OPENWINDIR)/lib
 MOTIF_LIBS = -lXm -lXt -lX11 -lm
 
 # Shared source objects (used by all three targets)
